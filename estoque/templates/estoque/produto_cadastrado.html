@@ -1,0 +1,14 @@
+{% extends "estoque/base.html" %}
+{% block title %}Produto cadastrado - Sistema Adega{% endblock %}
+
+{% block content %}
+  <h2>✅ Produto cadastrado</h2>
+
+  <p><b>{{ produto.nome }}</b> foi cadastrado com sucesso.</p>
+  <p>Código: <b>{{ produto.codigo_barras }}</b></p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="{{ voltar }}">Voltar</a>
+    <a class="btn" href="/">Menu</a>
+  </div>
+{% endblock %}

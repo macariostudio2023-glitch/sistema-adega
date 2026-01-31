@@ -1,0 +1,53 @@
+{% extends "estoque/base.html" %}
+{% block title %}Estoque Baixo - Sistema Adega{% endblock %}
+
+{% block content %}
+  <h2>📉 Estoque baixo</h2>
+  <p>Mostra produtos com estoque menor ou igual ao limite.</p>
+
+  <form method="get">
+    <label>Estoque baixo (até)</label>
+    {{ form.limite }}
+
+    <div class="actions">
+      <button class="confirm" type="submit">Filtrar</button>
+    </div>
+  </form>
+
+  <hr style="border:0;border-top:1px solid rgba(255,255,255,.12);margin:18px 0;">
+
+  <h3 style="margin:0 0 10px 0;">Limite atual: {{ limite }}</h3>
+
+  {% if produtos %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Produto</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Código</th>
+            <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Estoque</th>
+            <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Preço venda</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in produtos %}
+            <tr>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08);">{{ p.nome }}</td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08);">{{ p.codigo_barras }}</td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right;">
+                <b>{{ p.estoque_atual }}</b>
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right;">
+                R$ {{ p.preco_venda }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>Nenhum produto com estoque baixo para esse limite.</p>
+  {% endif %}
+
+  <div class="hint">Use esse relatório para repor antes de faltar no balcão.</div>
+{% endblock %}

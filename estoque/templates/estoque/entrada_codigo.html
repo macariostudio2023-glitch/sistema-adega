@@ -1,0 +1,198 @@
+{% extends "estoque/base.html" %}
+
+{% block title %}Entrada - Sistema Adega{% endblock %}
+{% block page_wrapper_class %}center-screen{% endblock %}
+
+{% block content %}
+<div class="centered-card">
+
+  <h2 style="text-align:center;">📦 Entrada por Código de Barras</h2>
+  <p style="text-align:center; margin-top:6px;">
+    Passe o leitor no campo abaixo e confirme.
+  </p>
+
+  {% if messages %}
+    <ul style="list-style:none; padding:0; margin:12px 0;">
+      {% for message in messages %}
+        <li style="
+          margin-bottom:8px;
+          padding:10px;
+          border-radius:10px;
+          font-weight:bold;
+          text-align:center;
+          background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %};
+        ">
+          {{ message }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <!-- 🔹 FORMULÁRIO DE ENTRADA -->
+  <form method="post" id="entradaForm">
+    {% csrf_token %}
+
+    <label style="text-align:left;">Código de barras</label>
+    {{ form.codigo_barras }}
+
+    <label style="text-align:left;">Quantidade</label>
+    {{ form.quantidade }}
+
+    <button type="submit">Confirmar Entrada</button>
+
+    <div class="hint" style="text-align:center;">
+      Dica: bipou o produto → ENTER confirma | F2 abre consulta
+    </div>
+  </form>
+
+  <!-- 🔎 CONSULTA DE ESTOQUE -->
+  <hr style="margin:26px 0; border-color:#1f2937; opacity:.6;">
+
+  <h3 id="titulo-consulta" style="text-align:center; margin:0 0 10px 0;">
+    🔎 Consultar produto no estoque
+  </h3>
+
+  <input
+    type="text"
+    id="busca-produto"
+    placeholder="Digite nome ou código de barras (F2)"
+    style="margin-bottom:10px; text-align:center;"
+  >
+
+  <div id="resultado-estoque"></div>
+
+</div>
+
+<script>
+  const campoCodigo = document.querySelector('input[name="codigo_barras"]');
+  const campoBusca = document.getElementById("busca-produto");
+  const form = document.getElementById("entradaForm");
+  const resultado = document.getElementById("resultado-estoque");
+
+  // ✅ FOCO no código ao abrir
+  window.onload = function () {
+    if (campoCodigo) campoCodigo.focus();
+  };
+
+  // ✅ ENTER confirma direto (leitor)
+  if (campoCodigo) {
+    campoCodigo.addEventListener("keydown", function(e){
+      if (e.key === "Enter") {
+        e.preventDefault();
+        form.submit();
+      }
+    });
+  }
+
+  // ✅ F2 foca a consulta
+  document.addEventListener("keydown", function(e){
+    if (e.key === "F2") {
+      e.preventDefault();
+      campoBusca.focus();
+      campoBusca.select();
+    }
+  });
+
+  // ✅ Debounce para não fazer fetch a cada tecla
+  let timer = null;
+
+  campoBusca.addEventListener("input", function () {
+    const termo = this.value.trim();
+
+    clearTimeout(timer);
+    timer = setTimeout(() => buscarEstoque(termo), 250);
+  });
+
+  function buscarEstoque(termo){
+    if (termo.length < 2) {
+      resultado.innerHTML = "";
+      return;
+    }
+
+    fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
+      .then(res => res.json())
+      .then(dados => {
+        if (!dados || dados.length === 0) {
+          resultado.innerHTML = `
+            <div style="
+              margin-top:10px;
+              padding:12px;
+              border-radius:12px;
+              text-align:center;
+              font-weight:bold;
+              background:rgba(239,68,68,.15);
+            ">
+              Nenhum produto encontrado.
+            </div>
+          `;
+          return;
+        }
+
+        let html = "<ul style='list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;'>";
+
+        dados.forEach(p => {
+          const estoqueBaixo = Number(p.estoque) <= 5;
+          const codigo = p.codigo || "";
+
+          html += `
+            <li
+              onclick="selecionarProduto('${codigo}')"
+              style="
+                cursor:pointer;
+                padding:12px;
+                border-radius:12px;
+                background:rgba(255,255,255,.05);
+                border:1px solid rgba(255,255,255,.08);
+                text-align:center;
+              "
+            >
+              <div style="font-weight:bold; font-size:16px;">${p.nome}</div>
+
+              <div style="opacity:.9; margin-top:6px;">
+                Código: <b>${codigo || "-"}</b> • Preço: <b>R$ ${p.preco}</b>
+              </div>
+
+              <div style="margin-top:8px; font-weight:bold; color:${estoqueBaixo ? '#f87171' : '#a7f3d0'};">
+                Estoque: ${p.estoque} ${estoqueBaixo ? "(BAIXO)" : ""}
+              </div>
+
+              <div style="margin-top:8px; font-size:12px; opacity:.85;">
+                Clique para preencher o código automaticamente
+              </div>
+            </li>
+          `;
+        });
+
+        html += "</ul>";
+        resultado.innerHTML = html;
+      })
+      .catch(() => {
+        resultado.innerHTML = `
+          <div style="
+            margin-top:10px;
+            padding:12px;
+            border-radius:12px;
+            text-align:center;
+            font-weight:bold;
+            background:rgba(239,68,68,.15);
+          ">
+            Erro ao consultar estoque.
+          </div>
+        `;
+      });
+  }
+
+  // 🖱️ Clicar → preenche o código e volta o foco
+  function selecionarProduto(codigo){
+    if(!codigo || !campoCodigo) return;
+    campoCodigo.value = codigo;
+    campoCodigo.focus();
+  }
+
+  // deixa global pra funcionar no onclick do HTML
+  window.selecionarProduto = selecionarProduto;
+</script>
+{% endblock %}
+
+
+

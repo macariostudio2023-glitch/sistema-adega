@@ -1,0 +1,199 @@
+{% extends "estoque/base.html" %}
+
+{% block title %}Saída / Venda{% endblock %}
+{% block page_wrapper_class %}center-screen{% endblock %}
+
+{% block content %}
+<div class="centered-card">
+
+  <h2>🧾 Saída / Venda</h2>
+
+  <!-- 🔍 BUSCA POR NOME -->
+  <label>Buscar produto pelo nome</label>
+  <input
+    type="text"
+    id="busca-produto"
+    placeholder="Digite o nome do produto"
+    autocomplete="off"
+  >
+
+  <ul id="resultado-busca" style="list-style:none; padding:0; margin-top:8px;"></ul>
+
+  <hr style="margin:20px 0;">
+
+  <!-- ✅ PRÉVIA DO VALOR (ANTES DE CONFIRMAR) -->
+  <div
+    style="
+      background:rgba(2,6,23,0.55);
+      border:1px solid #1f2937;
+      border-radius:12px;
+      padding:14px;
+      text-align:left;
+      margin-bottom:16px;
+    "
+  >
+    <div style="font-weight:800; margin-bottom:6px;">Prévia da venda</div>
+    <div>Produto: <span id="prev-nome" style="font-weight:700;">—</span></div>
+    <div>Preço unitário: <span id="prev-unit" style="font-weight:700;">R$ 0,00</span></div>
+    <div style="margin-top:8px; font-size:18px;">
+      Total: <span id="prev-total" style="font-weight:900;">R$ 0,00</span>
+    </div>
+    <div id="prev-erro" style="margin-top:8px; color:#fecaca; font-weight:700;"></div>
+  </div>
+
+  <!-- FORM DE SAÍDA -->
+  <form method="post">
+    {% csrf_token %}
+
+    <label>Código de barras</label>
+    {{ form.codigo_barras }}
+
+    <label>Quantidade</label>
+    {{ form.quantidade }}
+
+    <button type="submit">
+      ✅ Confirmar Venda
+    </button>
+  </form>
+
+</div>
+
+<script>
+const inputBusca = document.getElementById("busca-produto");
+const lista = document.getElementById("resultado-busca");
+const campoCodigo = document.getElementById("id_codigo_barras");
+const campoQtd = document.getElementById("id_quantidade");
+
+// ✅ Prévia (antes de confirmar)
+const prevNome = document.getElementById("prev-nome");
+const prevUnit = document.getElementById("prev-unit");
+const prevTotal = document.getElementById("prev-total");
+const prevErro = document.getElementById("prev-erro");
+
+function dinheiroBR(valor){
+  const n = Number(valor) || 0;
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function limparPrevia(){
+  prevNome.innerText = "—";
+  prevUnit.innerText = "R$ 0,00";
+  prevTotal.innerText = "R$ 0,00";
+  prevErro.innerText = "";
+}
+
+let timerPrevia = null;
+function atualizarPrevia(){
+  const codigo = (campoCodigo.value || "").trim();
+  const qtd = parseInt((campoQtd && campoQtd.value) ? campoQtd.value : "1", 10);
+
+  prevErro.innerText = "";
+
+  if(!codigo){
+    limparPrevia();
+    return;
+  }
+
+  if(!qtd || qtd <= 0){
+    prevErro.innerText = "Quantidade inválida.";
+    prevTotal.innerText = "R$ 0,00";
+    return;
+  }
+
+  clearTimeout(timerPrevia);
+  timerPrevia = setTimeout(() => {
+    fetch(`/consultar-estoque/?q=${encodeURIComponent(codigo)}`)
+      .then(res => res.json())
+      .then(dados => {
+        if(!dados || dados.length === 0){
+          prevErro.innerText = "Produto não encontrado.";
+          limparPrevia();
+          return;
+        }
+
+        const p = dados[0];
+
+        // p.preco vem como string (ex: "6.80" ou "6,80"). vamos garantir parse.
+        const preco = parseFloat(String(p.preco).replace(",", ".")) || 0;
+        const total = preco * qtd;
+
+        prevNome.innerText = p.nome || "—";
+        prevUnit.innerText = "R$ " + dinheiroBR(preco);
+        prevTotal.innerText = "R$ " + dinheiroBR(total);
+
+        // Se quiser avisar estoque antes de confirmar (opcional):
+        // if (typeof p.estoque !== "undefined" && Number(p.estoque) < qtd) {
+        //   prevErro.innerText = `Atenção: estoque atual ${p.estoque}.`;
+        // }
+      })
+      .catch(() => {
+        prevErro.innerText = "Erro ao consultar o produto.";
+      });
+  }, 180);
+}
+
+// Atualiza prévia quando digitar código ou mudar quantidade
+campoCodigo.addEventListener("input", atualizarPrevia);
+if (campoQtd) campoQtd.addEventListener("input", atualizarPrevia);
+
+
+// 🔍 Busca por nome (seu código + pequenas melhorias)
+inputBusca.addEventListener("keyup", function(){
+  const termo = inputBusca.value.trim();
+
+  if(termo.length < 2){
+    lista.innerHTML = "";
+    return;
+  }
+
+  fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
+    .then(res => res.json())
+    .then(dados => {
+      lista.innerHTML = "";
+
+      if(dados.length === 0){
+        lista.innerHTML = "<li>Produto não encontrado</li>";
+        return;
+      }
+
+      dados.forEach(p => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <strong>${p.nome}</strong>
+          <br>
+          <small>Estoque: ${p.estoque} | R$ ${p.preco}</small>
+        `;
+        li.style.padding = "10px";
+        li.style.border = "1px solid #374151";
+        li.style.borderRadius = "8px";
+        li.style.marginBottom = "6px";
+        li.style.cursor = "pointer";
+
+        li.onclick = () => {
+          campoCodigo.value = p.codigo;
+          lista.innerHTML = "";
+          inputBusca.value = p.nome;
+
+          // ✅ Atualiza prévia automaticamente ao selecionar um produto
+          atualizarPrevia();
+
+          // coloca foco na quantidade para agilizar
+          if (campoQtd) campoQtd.focus();
+        };
+
+        lista.appendChild(li);
+      });
+    });
+});
+
+// Se a página abrir já com valores (ou ao colar código), atualiza
+atualizarPrevia();
+</script>
+
+{% endblock %}
+
+
+
+
+
+

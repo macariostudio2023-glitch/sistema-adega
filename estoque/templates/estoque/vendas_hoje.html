@@ -1,0 +1,48 @@
+{% extends "estoque/base.html" %}
+{% block title %}Vendas de Hoje - Sistema Adega{% endblock %}
+
+{% block content %}
+  <h2>🧾 Vendas de Hoje</h2>
+  <p>Data: <b>{{ hoje }}</b></p>
+
+  {% if itens %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Horário</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Produto</th>
+            <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Qtd</th>
+            <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,.12);">Preço venda</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in itens %}
+            <tr>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08);">
+                {{ m.data|date:"H:i" }}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08);">
+                {{ m.produto.nome }}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right;">
+                {{ m.quantidade }}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right;">
+                R$ {{ m.produto.preco_venda }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="text-align:right; margin-top:16px;">
+      Total do dia: R$ {{ total|floatformat:2 }}</b>
+    </h3>
+  {% else %}
+    <p>Nenhuma venda registrada hoje.</p>
+  {% endif %}
+
+  <div class="hint">Esse total ajuda a fechar o caixa do dia.</div>
+{% endblock %}

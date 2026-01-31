@@ -1,0 +1,51 @@
+{% extends "estoque/base.html" %}
+{% block title %}Novo Produto - Sistema Adega{% endblock %}
+
+{% block content %}
+  <h2>🆕 Cadastrar Produto</h2>
+  <p>Esse código não existe ainda. Cadastre para continuar.</p>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li class="msg {% if message.tags == 'error' %}msg-error{% endif %}{% if message.tags == 'success' %}msg-success{% endif %}">
+          {{ message }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if form %}
+    <form method="post">
+      {% csrf_token %}
+
+      <label>Código de barras</label>
+      {{ form.codigo_barras }}
+
+      <label>Nome do produto</label>
+      {{ form.nome }}
+
+      <label>Categoria</label>
+      {{ form.categoria }}
+
+      <label>Preço de custo</label>
+      {{ form.preco_custo }}
+
+      <label>Preço de venda</label>
+      {{ form.preco_venda }}
+
+      <label>Estoque inicial</label>
+      {{ form.estoque_inicial }}
+
+      <div class="actions">
+        <button class="confirm" type="submit">Salvar Produto</button>
+      </div>
+
+      <div class="hint">
+        Após salvar, você volta automaticamente para continuar a operação.
+      </div>
+    </form>
+  {% else %}
+    <p>Não foi possível abrir o cadastro (faltou o código).</p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "estoque/base.html" %}
+{% block title %}Relatórios - Sistema Adega{% endblock %}
+
+{% block content %}
+  <h2>📊 Relatórios</h2>
+  <p>Escolha o relatório que você quer ver.</p>
+
+  <div class="menu">
+    <a href="/relatorios/estoque-baixo/">📉 Estoque baixo</a>
+    <a href="/relatorios/vendas-hoje/">🧾 Vendas de hoje</a>
+    <a href="/relatorios/vendas-periodo/">📆 Vendas por período</a>
+  </div>
+
+  <div class="hint">
+    Dica: abra essa tela no tablet do balcão e use como painel.
+  </div>
+{% endblock %}
