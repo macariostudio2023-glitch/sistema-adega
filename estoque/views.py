@@ -4,7 +4,7 @@ from django.db import transaction
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Sum, F, Q
+from django.db.models import Sum, F, Q, DecimalField, ExpressionWrapper
 from django.http import JsonResponse
 
 from .models import Adega, Produto, Movimentacao
@@ -176,10 +176,70 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS
+# RELATÓRIOS (CORRIGIDO: NÃO ABRE EM BRANCO)
 # =========================
 def relatorios(request):
-    return render(request, "estoque/relatorios.html")
+    adega = get_adega_atual(request)
+
+    # ✅ Período padrão (últimos 7 dias) para não abrir em branco
+    hoje = timezone.localdate()
+    padrao_inicio = hoje - timedelta(days=7)
+    padrao_fim = hoje
+
+    # ✅ Se não veio data no GET, injeta padrão
+    dados = request.GET.copy()
+    if not dados.get("data_inicio") or not dados.get("data_fim"):
+        dados["data_inicio"] = padrao_inicio
+        dados["data_fim"] = padrao_fim
+
+    form = FiltroPeriodoVendasForm(dados)
+
+    itens = Movimentacao.objects.none()
+    resumo = {
+        "total_vendido": 0,
+        "total_itens": 0,
+        "total_vendas": 0,
+    }
+    data_inicio = data_fim = None
+
+    if form.is_valid():
+        data_inicio = form.cleaned_data["data_inicio"]
+        data_fim = form.cleaned_data["data_fim"]
+
+        tz = timezone.get_current_timezone()
+        inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
+        fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
+
+        # ✅ total por linha calculado no banco
+        total_linha_expr = ExpressionWrapper(
+            F("quantidade") * F("produto__preco_venda"),
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        )
+
+        itens = (
+            Movimentacao.objects
+            .filter(
+                adega=adega,
+                tipo="SAIDA",
+                data__gte=inicio,
+                data__lte=fim
+            )
+            .select_related("produto")
+            .annotate(total_linha=total_linha_expr)
+            .order_by("-data")
+        )
+
+        resumo["total_itens"] = itens.aggregate(total=Sum("quantidade"))["total"] or 0
+        resumo["total_vendido"] = itens.aggregate(total=Sum("total_linha"))["total"] or 0
+        resumo["total_vendas"] = itens.count()
+
+    return render(request, "estoque/relatorios.html", {
+        "form": form,
+        "itens": itens,
+        "resumo": resumo,
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
+    })
 
 
 def estoque_baixo(request):
@@ -203,12 +263,13 @@ def vendas_hoje(request):
     adega = get_adega_atual(request)
     hoje = timezone.localdate()
 
-    inicio = timezone.make_aware(datetime.combine(hoje, time.min))
-    fim = inicio + timedelta(days=1)
+    tz = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(hoje, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(hoje, time.max), tz)
 
     itens = (
         Movimentacao.objects
-        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lt=fim)
+        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
         .select_related("produto")
         .order_by("-data")
     )
@@ -224,24 +285,31 @@ def vendas_hoje(request):
     })
 
 
+# ✅ CORRIGIDO: aceita GET e POST e calcula cards
 def vendas_periodo(request):
     adega = get_adega_atual(request)
-    form = FiltroPeriodoVendasForm(request.GET or None)
+
+    # ✅ Aceita tanto GET quanto POST
+    data_source = request.GET if request.method == "GET" else request.POST
+    form = FiltroPeriodoVendasForm(data_source or None)
 
     itens = Movimentacao.objects.none()
     total = 0
+    total_itens = 0
+    numero_vendas = 0
     data_inicio = data_fim = None
 
     if form.is_valid():
         data_inicio = form.cleaned_data["data_inicio"]
         data_fim = form.cleaned_data["data_fim"]
 
-        inicio = timezone.make_aware(datetime.combine(data_inicio, time.min))
-        fim = timezone.make_aware(datetime.combine(data_fim, time.min)) + timedelta(days=1)
+        tz = timezone.get_current_timezone()
+        inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
+        fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
 
         itens = (
             Movimentacao.objects
-            .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lt=fim)
+            .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
             .select_related("produto")
             .order_by("-data")
         )
@@ -250,10 +318,15 @@ def vendas_periodo(request):
             total=Sum(F("quantidade") * F("produto__preco_venda"))
         )["total"] or 0
 
+        total_itens = itens.aggregate(total=Sum("quantidade"))["total"] or 0
+        numero_vendas = itens.count()
+
     return render(request, "estoque/vendas_periodo.html", {
         "form": form,
         "itens": itens,
         "total": total,
+        "total_itens": total_itens,
+        "numero_vendas": numero_vendas,
         "data_inicio": data_inicio,
         "data_fim": data_fim,
     })
@@ -287,3 +360,4 @@ def consultar_estoque(request):
     ]
 
     return JsonResponse(dados, safe=False)
+
