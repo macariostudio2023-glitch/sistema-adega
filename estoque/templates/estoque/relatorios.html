@@ -1,38 +1,15 @@
+
 {% extends "estoque/base.html" %}
 
-{% block title %}Relatórios - Sistema Adega{% endblock %}
+{% block title %}Relatório do Mês - Sistema Adega{% endblock %}
 
 {% block content %}
 <div class="container">
 
-  <h2>📊 Relatórios de Vendas</h2>
+  <h2>📊 Relatório do Mês</h2>
   <p class="text-muted">
-    Relatório do mês atual (do dia 1 até hoje).
+    Período: <b>{{ inicio_mes|date:"d/m/Y" }}</b> até <b>{{ hoje|date:"d/m/Y" }}</b>
   </p>
-
-  <!-- FILTRO (opcional: pode usar, mas o mês já vem automático) -->
-  <div class="card filtro">
-    <form method="get" class="form-filtro">
-      <div class="campo">
-        <label>Data inicial</label>
-        {{ form.data_inicio }}
-      </div>
-
-      <div class="campo">
-        <label>Data final</label>
-        {{ form.data_fim }}
-      </div>
-
-      <div class="acoes">
-        <button type="submit" class="btn btn-primary">
-          🔍 Gerar relatório
-        </button>
-        <a href="/relatorios/" class="btn btn-secondary">
-          Limpar
-        </a>
-      </div>
-    </form>
-  </div>
 
   <!-- RESUMO -->
   <div class="cards">
@@ -54,7 +31,7 @@
 
   <!-- TABELA -->
   <div class="card tabela">
-    <h3>Detalhamento das vendas</h3>
+    <h3>Detalhamento das vendas do mês</h3>
 
     <table>
       <thead>
@@ -70,18 +47,15 @@
         {% for mov in itens %}
         <tr>
           <td>{{ mov.data|date:"d/m/Y H:i" }}</td>
-          <td>{{ mov.produto.nome }}</td>
+          <td>{{ mov.produto_nome }}</td>
           <td>{{ mov.quantidade }}</td>
-          <td>R$ {{ mov.produto.preco_venda|floatformat:2 }}</td>
-          <td>
-            <!-- ✅ TOTAL CORRETO: vem do annotate(total_linha=...) no views -->
-            R$ {{ mov.total_linha|floatformat:2 }}
-          </td>
+          <td>R$ {{ mov.preco_venda|floatformat:2 }}</td>
+          <td>R$ {{ mov.total_linha|floatformat:2 }}</td>
         </tr>
         {% empty %}
         <tr>
           <td colspan="5" class="vazio">
-            Nenhuma venda encontrada no período.
+            Nenhuma venda encontrada neste mês.
           </td>
         </tr>
         {% endfor %}
@@ -92,14 +66,8 @@
 </div>
 
 <style>
-.container {
-  max-width: 1100px;
-}
-
-.text-muted {
-  color: #6b7280;
-  margin-bottom: 16px;
-}
+.container { max-width: 1100px; }
+.text-muted { color: #6b7280; margin-bottom: 16px; }
 
 .card {
   background: #fff;
@@ -109,83 +77,19 @@
   box-shadow: 0 4px 10px rgba(0,0,0,.05);
 }
 
-.form-filtro {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: end;
-}
-
-.campo {
-  display: flex;
-  flex-direction: column;
-}
-
-.campo label {
-  font-size: 13px;
-  color: #555;
-}
-
-.acoes {
-  display: flex;
-  gap: 10px;
-}
-
-.btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-primary {
-  background: #2563eb;
-  color: #fff;
-}
-
-.btn-secondary {
-  background: #e5e7eb;
-  color: #111;
-}
-
 .cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
-.resumo span {
-  font-size: 13px;
-  color: #6b7280;
-}
+.resumo span { font-size: 13px; color: #6b7280; }
+.resumo strong { font-size: 22px; }
 
-.resumo strong {
-  font-size: 22px;
-}
+.tabela table { width: 100%; border-collapse: collapse; }
+.tabela th, .tabela td { padding: 10px; border-bottom: 1px solid #eee; }
+.tabela th { text-align: left; font-size: 13px; color: #6b7280; }
 
-.tabela table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.tabela th,
-.tabela td {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.tabela th {
-  text-align: left;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.vazio {
-  text-align: center;
-  color: #6b7280;
-  padding: 20px;
-}
+.vazio { text-align: center; color: #6b7280; padding: 20px; }
 </style>
-
 {% endblock %}
