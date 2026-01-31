@@ -1,4 +1,8 @@
+from datetime import timedelta
+
 from django import forms
+from django.utils import timezone
+
 from .models import Categoria
 
 
@@ -65,6 +69,8 @@ class NovoProdutoPorCodigoForm(forms.Form):
         min_value=0,
         initial=0
     )
+
+
 class FiltroEstoqueBaixoForm(forms.Form):
     limite = forms.IntegerField(
         label="Estoque baixo (até)",
@@ -75,10 +81,22 @@ class FiltroEstoqueBaixoForm(forms.Form):
 
 class FiltroPeriodoVendasForm(forms.Form):
     data_inicio = forms.DateField(
-        label="Data início (AAAA-MM-DD)",
+        label="Data inicial",
+        required=False,
         widget=forms.DateInput(attrs={"type": "date"})
     )
     data_fim = forms.DateField(
-        label="Data fim (AAAA-MM-DD)",
+        label="Data final",
+        required=False,
         widget=forms.DateInput(attrs={"type": "date"})
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # ✅ Se o usuário não informou datas, preenche automático:
+        # últimos 7 dias até hoje
+        if not self.data.get("data_inicio") and not self.data.get("data_fim"):
+            hoje = timezone.localdate()
+            self.initial["data_inicio"] = hoje - timedelta(days=7)
+            self.initial["data_fim"] = hoje
