@@ -21,7 +21,13 @@ from .forms import (
 # ADEGA ATUAL (FIXA)
 # =========================
 def get_adega_atual(request):
-    return Adega.objects.get(id=1)
+    # ✅ No Render o banco começa vazio.
+    # Se não existir a Adega id=1, cria automaticamente.
+    adega, _ = Adega.objects.get_or_create(
+        id=1,
+        defaults={"nome": "Adega Principal"}
+    )
+    return adega
 
 
 # =========================
@@ -254,7 +260,30 @@ def vendas_periodo(request):
 
 
 # =========================
-# CONSULTA DE ESTOQUE
+# CONSULTA DE ESTOQUE (autocomplete / busca)
 # =========================
 def consultar_estoque(request):
-    a
+    adega = get_adega_atual(request)
+    termo = request.GET.get("q", "").strip()
+
+    produtos = (
+        Produto.objects
+        .filter(adega=adega)
+        .filter(
+            Q(nome__icontains=termo) |
+            Q(codigo_barras__icontains=termo)
+        )
+        .order_by("nome")[:10]
+    )
+
+    dados = [
+        {
+            "nome": p.nome,
+            "codigo": p.codigo_barras,
+            "estoque": p.estoque_atual,
+            "preco": str(p.preco_venda),
+        }
+        for p in produtos
+    ]
+
+    return JsonResponse(dados, safe=False)
