@@ -175,7 +175,7 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (AUTOMÁTICO)
+# RELATÓRIOS (AUTOMÁTICO + FUNCIONA NO BOTÃO)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
@@ -184,7 +184,10 @@ def relatorios(request):
     padrao_inicio = hoje - timedelta(days=7)
     padrao_fim = hoje
 
-    dados = request.GET.copy()
+    # ✅ AGORA ACEITA GET E POST (isso corrige o "Gerar relatório")
+    data_source = request.GET if request.method == "GET" else request.POST
+    dados = data_source.copy() if data_source else {}
+
     if not dados.get("data_inicio"):
         dados["data_inicio"] = padrao_inicio
     if not dados.get("data_fim"):
@@ -192,7 +195,6 @@ def relatorios(request):
 
     form = FiltroPeriodoVendasForm(dados)
 
-    # ✅ mesmo se o form vier inválido, usamos o padrão
     if form.is_valid():
         data_inicio = form.cleaned_data.get("data_inicio") or padrao_inicio
         data_fim = form.cleaned_data.get("data_fim") or padrao_fim
