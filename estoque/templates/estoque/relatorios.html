@@ -7,10 +7,10 @@
 
   <h2>📊 Relatórios de Vendas</h2>
   <p class="text-muted">
-    Acompanhe o desempenho da adega por período.
+    Relatório do mês atual (do dia 1 até hoje).
   </p>
 
-  <!-- FILTRO -->
+  <!-- FILTRO (opcional: pode usar, mas o mês já vem automático) -->
   <div class="card filtro">
     <form method="get" class="form-filtro">
       <div class="campo">
@@ -74,7 +74,8 @@
           <td>{{ mov.quantidade }}</td>
           <td>R$ {{ mov.produto.preco_venda|floatformat:2 }}</td>
           <td>
-            R$ {{ mov.quantidade|floatformat:0|add:"0"|floatformat:0|add:"0" }}
+            <!-- ✅ TOTAL CORRETO: vem do annotate(total_linha=...) no views -->
+            R$ {{ mov.total_linha|floatformat:2 }}
           </td>
         </tr>
         {% empty %}
