@@ -18,11 +18,40 @@ from .forms import (
 
 
 # =========================
+# FUNÇÃO AUXILIAR: parse de data (aceita YYYY-MM-DD e DD/MM/YYYY)
+# =========================
+def _parse_date_value(value):
+    """
+    Aceita:
+    - date object
+    - 'YYYY-MM-DD' (input type=date)
+    - 'DD/MM/YYYY' (caso template esteja enviando assim)
+    Retorna date ou None.
+    """
+    if not value:
+        return None
+
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        # já é date/datetime
+        return value.date() if hasattr(value, "hour") else value
+
+    if isinstance(value, str):
+        value = value.strip()
+        try:
+            if "/" in value:
+                return datetime.strptime(value, "%d/%m/%Y").date()
+            if "-" in value:
+                return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    return None
+
+
+# =========================
 # ADEGA ATUAL (FIXA)
 # =========================
 def get_adega_atual(request):
-    # ✅ No Render o banco começa vazio.
-    # Se não existir a Adega id=1, cria automaticamente.
     adega, _ = Adega.objects.get_or_create(
         id=1,
         defaults={"nome": "Adega Principal"}
@@ -55,7 +84,6 @@ def entrada_codigo_barras(request):
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
         except Produto.DoesNotExist:
-            # ✅ SEM MENSAGEM DE ERRO (não aparece "Código não encontrado")
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
 
         Movimentacao.objects.create(
@@ -97,17 +125,13 @@ def saida_codigo_barras(request):
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
         except Produto.DoesNotExist:
-            # ✅ SEM MENSAGEM DE ERRO (não aparece faixa vermelha)
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
 
         with transaction.atomic():
             produto.refresh_from_db()
 
             if produto.estoque_atual < quantidade:
-                messages.error(
-                    request,
-                    f"Estoque insuficiente. Atual: {produto.estoque_atual}"
-                )
+                messages.error(request, f"Estoque insuficiente. Atual: {produto.estoque_atual}")
                 return render(request, "estoque/saida_codigo.html", {"form": form})
 
             Movimentacao.objects.create(
@@ -119,7 +143,6 @@ def saida_codigo_barras(request):
             )
 
         valor_total = quantidade * produto.preco_venda
-
         messages.success(
             request,
             f"✅ Venda registrada com sucesso!\n"
@@ -175,7 +198,7 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (AUTOMÁTICO + FUNCIONA NO BOTÃO)
+# RELATÓRIOS (AUTOMÁTICO + TROCA DATA SE VIER INVERTIDA)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
@@ -184,23 +207,26 @@ def relatorios(request):
     padrao_inicio = hoje - timedelta(days=7)
     padrao_fim = hoje
 
-    # ✅ AGORA ACEITA GET E POST (isso corrige o "Gerar relatório")
+    # ✅ aceita GET e POST
     data_source = request.GET if request.method == "GET" else request.POST
     dados = data_source.copy() if data_source else {}
 
-    if not dados.get("data_inicio"):
-        dados["data_inicio"] = padrao_inicio
-    if not dados.get("data_fim"):
-        dados["data_fim"] = padrao_fim
+    # ✅ pega datas (aceita YYYY-MM-DD e DD/MM/YYYY)
+    di_raw = dados.get("data_inicio")
+    df_raw = dados.get("data_fim")
 
-    form = FiltroPeriodoVendasForm(dados)
+    data_inicio = _parse_date_value(di_raw) or padrao_inicio
+    data_fim = _parse_date_value(df_raw) or padrao_fim
 
-    if form.is_valid():
-        data_inicio = form.cleaned_data.get("data_inicio") or padrao_inicio
-        data_fim = form.cleaned_data.get("data_fim") or padrao_fim
-    else:
-        data_inicio = padrao_inicio
-        data_fim = padrao_fim
+    # ✅ se vier invertido, troca automaticamente
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+
+    # form só para renderizar os inputs preenchidos
+    form = FiltroPeriodoVendasForm({
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
+    })
 
     tz = timezone.get_current_timezone()
     inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
@@ -278,7 +304,7 @@ def vendas_hoje(request):
 
 
 # =========================
-# VENDAS POR PERÍODO (AUTOMÁTICO)
+# VENDAS POR PERÍODO (AUTOMÁTICO + TROCA DATA SE VIER INVERTIDA)
 # =========================
 def vendas_periodo(request):
     adega = get_adega_atual(request)
@@ -290,19 +316,19 @@ def vendas_periodo(request):
     data_source = request.GET if request.method == "GET" else request.POST
     dados = data_source.copy() if data_source else {}
 
-    if not dados.get("data_inicio"):
-        dados["data_inicio"] = padrao_inicio
-    if not dados.get("data_fim"):
-        dados["data_fim"] = padrao_fim
+    di_raw = dados.get("data_inicio")
+    df_raw = dados.get("data_fim")
 
-    form = FiltroPeriodoVendasForm(dados)
+    data_inicio = _parse_date_value(di_raw) or padrao_inicio
+    data_fim = _parse_date_value(df_raw) or padrao_fim
 
-    if form.is_valid():
-        data_inicio = form.cleaned_data.get("data_inicio") or padrao_inicio
-        data_fim = form.cleaned_data.get("data_fim") or padrao_fim
-    else:
-        data_inicio = padrao_inicio
-        data_fim = padrao_fim
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+
+    form = FiltroPeriodoVendasForm({
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
+    })
 
     tz = timezone.get_current_timezone()
     inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
