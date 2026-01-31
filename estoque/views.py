@@ -21,18 +21,11 @@ from .forms import (
 # FUNÇÃO AUXILIAR: parse de data (aceita YYYY-MM-DD e DD/MM/YYYY)
 # =========================
 def _parse_date_value(value):
-    """
-    Aceita:
-    - date object
-    - 'YYYY-MM-DD' (input type=date)
-    - 'DD/MM/YYYY' (caso template esteja enviando assim)
-    Retorna date ou None.
-    """
     if not value:
         return None
 
+    # já é date/datetime
     if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
-        # já é date/datetime
         return value.date() if hasattr(value, "hour") else value
 
     if isinstance(value, str):
@@ -198,7 +191,7 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (AUTOMÁTICO + TROCA DATA SE VIER INVERTIDA)
+# RELATÓRIOS (AUTOMÁTICO + POST/GET + CORRIGE DATA + ACEITA TIPOS DIFERENTES)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
@@ -211,18 +204,18 @@ def relatorios(request):
     data_source = request.GET if request.method == "GET" else request.POST
     dados = data_source.copy() if data_source else {}
 
-    # ✅ pega datas (aceita YYYY-MM-DD e DD/MM/YYYY)
+    # ✅ lê datas em qualquer formato e aplica padrão
     di_raw = dados.get("data_inicio")
     df_raw = dados.get("data_fim")
 
     data_inicio = _parse_date_value(di_raw) or padrao_inicio
     data_fim = _parse_date_value(df_raw) or padrao_fim
 
-    # ✅ se vier invertido, troca automaticamente
+    # ✅ se veio invertido, troca
     if data_inicio > data_fim:
         data_inicio, data_fim = data_fim, data_inicio
 
-    # form só para renderizar os inputs preenchidos
+    # form serve só pra renderizar campos preenchidos
     form = FiltroPeriodoVendasForm({
         "data_inicio": data_inicio,
         "data_fim": data_fim,
@@ -237,9 +230,11 @@ def relatorios(request):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
 
+    # ✅ Aqui é o pulo do gato: pega vendas mesmo que o tipo esteja diferente
     itens = (
         Movimentacao.objects
-        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
+        .filter(adega=adega, data__gte=inicio, data__lte=fim)
+        .filter(Q(tipo__iexact="SAIDA") | Q(tipo__iexact="SAÍDA") | Q(tipo__iexact="VENDA"))
         .select_related("produto")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
@@ -304,7 +299,7 @@ def vendas_hoje(request):
 
 
 # =========================
-# VENDAS POR PERÍODO (AUTOMÁTICO + TROCA DATA SE VIER INVERTIDA)
+# VENDAS POR PERÍODO (AUTOMÁTICO + CORRIGE DATA + ACEITA TIPOS DIFERENTES)
 # =========================
 def vendas_periodo(request):
     adega = get_adega_atual(request)
@@ -341,7 +336,8 @@ def vendas_periodo(request):
 
     itens = (
         Movimentacao.objects
-        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
+        .filter(adega=adega, data__gte=inicio, data__lte=fim)
+        .filter(Q(tipo__iexact="SAIDA") | Q(tipo__iexact="SAÍDA") | Q(tipo__iexact="VENDA"))
         .select_related("produto")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
