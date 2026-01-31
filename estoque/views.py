@@ -308,3 +308,7 @@ def vendas_hoje(request):
         "itens": itens,
         "total": total,
     })
+def vendas_periodo(request):
+    # ✅ Só existe pra não quebrar seu urls.py no Render.
+    # Aqui vamos reaproveitar o relatório do mês atual.
+    return relatorios(request)
