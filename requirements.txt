@@ -1,8 +1,8 @@
-Django>=4.2
+Django==5.2.10
 gunicorn
 whitenoise
-psycopg2-binary
 python-dotenv
+psycopg2-binary
 
 
 
