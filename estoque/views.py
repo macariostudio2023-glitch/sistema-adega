@@ -120,7 +120,6 @@ def saida_codigo_barras(request):
 
         valor_total = quantidade * produto.preco_venda
 
-        # ✅ MENSAGEM FINAL DO JEITO QUE VOCÊ PEDIU
         messages.success(
             request,
             f"✅ Venda registrada com sucesso!\n"
@@ -176,62 +175,53 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (CORRIGIDO: NÃO ABRE EM BRANCO)
+# RELATÓRIOS (AUTOMÁTICO)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
 
-    # ✅ Período padrão (últimos 7 dias) para não abrir em branco
     hoje = timezone.localdate()
     padrao_inicio = hoje - timedelta(days=7)
     padrao_fim = hoje
 
-    # ✅ Se não veio data no GET, injeta padrão
     dados = request.GET.copy()
-    if not dados.get("data_inicio") or not dados.get("data_fim"):
+    if not dados.get("data_inicio"):
         dados["data_inicio"] = padrao_inicio
+    if not dados.get("data_fim"):
         dados["data_fim"] = padrao_fim
 
     form = FiltroPeriodoVendasForm(dados)
 
-    itens = Movimentacao.objects.none()
-    resumo = {
-        "total_vendido": 0,
-        "total_itens": 0,
-        "total_vendas": 0,
-    }
-    data_inicio = data_fim = None
-
+    # ✅ mesmo se o form vier inválido, usamos o padrão
     if form.is_valid():
-        data_inicio = form.cleaned_data["data_inicio"]
-        data_fim = form.cleaned_data["data_fim"]
+        data_inicio = form.cleaned_data.get("data_inicio") or padrao_inicio
+        data_fim = form.cleaned_data.get("data_fim") or padrao_fim
+    else:
+        data_inicio = padrao_inicio
+        data_fim = padrao_fim
 
-        tz = timezone.get_current_timezone()
-        inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
-        fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
+    tz = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
 
-        # ✅ total por linha calculado no banco
-        total_linha_expr = ExpressionWrapper(
-            F("quantidade") * F("produto__preco_venda"),
-            output_field=DecimalField(max_digits=12, decimal_places=2)
-        )
+    total_linha_expr = ExpressionWrapper(
+        F("quantidade") * F("produto__preco_venda"),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
 
-        itens = (
-            Movimentacao.objects
-            .filter(
-                adega=adega,
-                tipo="SAIDA",
-                data__gte=inicio,
-                data__lte=fim
-            )
-            .select_related("produto")
-            .annotate(total_linha=total_linha_expr)
-            .order_by("-data")
-        )
+    itens = (
+        Movimentacao.objects
+        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
+        .select_related("produto")
+        .annotate(total_linha=total_linha_expr)
+        .order_by("-data")
+    )
 
-        resumo["total_itens"] = itens.aggregate(total=Sum("quantidade"))["total"] or 0
-        resumo["total_vendido"] = itens.aggregate(total=Sum("total_linha"))["total"] or 0
-        resumo["total_vendas"] = itens.count()
+    resumo = {
+        "total_itens": itens.aggregate(total=Sum("quantidade"))["total"] or 0,
+        "total_vendido": itens.aggregate(total=Sum("total_linha"))["total"] or 0,
+        "total_vendas": itens.count(),
+    }
 
     return render(request, "estoque/relatorios.html", {
         "form": form,
@@ -285,41 +275,53 @@ def vendas_hoje(request):
     })
 
 
-# ✅ CORRIGIDO: aceita GET e POST e calcula cards
+# =========================
+# VENDAS POR PERÍODO (AUTOMÁTICO)
+# =========================
 def vendas_periodo(request):
     adega = get_adega_atual(request)
 
-    # ✅ Aceita tanto GET quanto POST
-    data_source = request.GET if request.method == "GET" else request.POST
-    form = FiltroPeriodoVendasForm(data_source or None)
+    hoje = timezone.localdate()
+    padrao_inicio = hoje - timedelta(days=7)
+    padrao_fim = hoje
 
-    itens = Movimentacao.objects.none()
-    total = 0
-    total_itens = 0
-    numero_vendas = 0
-    data_inicio = data_fim = None
+    data_source = request.GET if request.method == "GET" else request.POST
+    dados = data_source.copy() if data_source else {}
+
+    if not dados.get("data_inicio"):
+        dados["data_inicio"] = padrao_inicio
+    if not dados.get("data_fim"):
+        dados["data_fim"] = padrao_fim
+
+    form = FiltroPeriodoVendasForm(dados)
 
     if form.is_valid():
-        data_inicio = form.cleaned_data["data_inicio"]
-        data_fim = form.cleaned_data["data_fim"]
+        data_inicio = form.cleaned_data.get("data_inicio") or padrao_inicio
+        data_fim = form.cleaned_data.get("data_fim") or padrao_fim
+    else:
+        data_inicio = padrao_inicio
+        data_fim = padrao_fim
 
-        tz = timezone.get_current_timezone()
-        inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
-        fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
+    tz = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
 
-        itens = (
-            Movimentacao.objects
-            .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
-            .select_related("produto")
-            .order_by("-data")
-        )
+    total_linha_expr = ExpressionWrapper(
+        F("quantidade") * F("produto__preco_venda"),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
 
-        total = itens.aggregate(
-            total=Sum(F("quantidade") * F("produto__preco_venda"))
-        )["total"] or 0
+    itens = (
+        Movimentacao.objects
+        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
+        .select_related("produto")
+        .annotate(total_linha=total_linha_expr)
+        .order_by("-data")
+    )
 
-        total_itens = itens.aggregate(total=Sum("quantidade"))["total"] or 0
-        numero_vendas = itens.count()
+    total = itens.aggregate(total=Sum("total_linha"))["total"] or 0
+    total_itens = itens.aggregate(total=Sum("quantidade"))["total"] or 0
+    numero_vendas = itens.count()
 
     return render(request, "estoque/vendas_periodo.html", {
         "form": form,
@@ -360,4 +362,3 @@ def consultar_estoque(request):
     ]
 
     return JsonResponse(dados, safe=False)
-
