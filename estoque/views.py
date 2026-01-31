@@ -41,15 +41,11 @@ def _parse_date_value(value):
     return None
 
 
-def _date_to_html(d):
-    """Converte date -> string YYYY-MM-DD (formato que input type=date entende)."""
-    return d.strftime("%Y-%m-%d") if d else ""
-
-
 # =========================
 # ADEGA ATUAL (FIXA)
 # =========================
 def get_adega_atual(request):
+    # ✅ Se não existir a Adega id=1, cria automaticamente.
     adega, _ = Adega.objects.get_or_create(
         id=1,
         defaults={"nome": "Adega Principal"}
@@ -82,6 +78,7 @@ def entrada_codigo_barras(request):
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
         except Produto.DoesNotExist:
+            # ✅ não mostra erro, manda pro cadastro do produto
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
 
         Movimentacao.objects.create(
@@ -123,6 +120,7 @@ def saida_codigo_barras(request):
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
         except Produto.DoesNotExist:
+            # ✅ não mostra erro, manda pro cadastro do produto
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
 
         with transaction.atomic():
@@ -196,48 +194,30 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (ROBUSTO: funciona mesmo com data invertida e tipo diferente)
+# RELATÓRIOS (MÊS ATUAL AUTOMÁTICO)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
 
     hoje = timezone.localdate()
-    padrao_inicio = hoje - timedelta(days=30)  # 30 dias pra garantir
-    padrao_fim = hoje
-
-    data_source = request.GET if request.method == "GET" else request.POST
-    dados = data_source.copy() if data_source else {}
-
-    di_raw = dados.get("data_inicio")
-    df_raw = dados.get("data_fim")
-
-    data_inicio = _parse_date_value(di_raw) or padrao_inicio
-    data_fim = _parse_date_value(df_raw) or padrao_fim
-
-    if data_inicio > data_fim:
-        data_inicio, data_fim = data_fim, data_inicio
-
-    # ✅ importante: enviar no formato YYYY-MM-DD para o input type=date
-    form = FiltroPeriodoVendasForm({
-        "data_inicio": _date_to_html(data_inicio),
-        "data_fim": _date_to_html(data_fim),
-    })
+    inicio_mes = hoje.replace(day=1)
+    fim_mes = hoje
 
     tz = timezone.get_current_timezone()
-    inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
-    fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
+    inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(fim_mes, time.max), tz)
 
     total_linha_expr = ExpressionWrapper(
         F("quantidade") * F("produto__preco_venda"),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
 
-    # ✅ robusto: pega tudo que NÃO é entrada, e restringe pela adega fixa
+    # ✅ pega tudo que NÃO é ENTRADA no mês atual (saídas/vendas)
     itens = (
         Movimentacao.objects
         .filter(adega=adega, data__gte=inicio, data__lte=fim)
         .exclude(tipo__iexact="ENTRADA")
-        .select_related("produto", "adega")
+        .select_related("produto")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
     )
@@ -248,12 +228,19 @@ def relatorios(request):
         "total_vendas": itens.count(),
     }
 
+    # ✅ mantém o form preenchido, mas você não precisa mexer
+    form = FiltroPeriodoVendasForm(initial={
+        "data_inicio": inicio_mes,
+        "data_fim": fim_mes,
+    })
+
     return render(request, "estoque/relatorios.html", {
         "form": form,
         "itens": itens,
         "resumo": resumo,
-        "data_inicio": data_inicio,
-        "data_fim": data_fim,
+        "data_inicio": inicio_mes,
+        "data_fim": fim_mes,
+        "modo": "mes",
     })
 
 
@@ -282,19 +269,21 @@ def vendas_hoje(request):
     inicio = timezone.make_aware(datetime.combine(hoje, time.min), tz)
     fim = timezone.make_aware(datetime.combine(hoje, time.max), tz)
 
+    total_linha_expr = ExpressionWrapper(
+        F("quantidade") * F("produto__preco_venda"),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+
     itens = (
         Movimentacao.objects
         .filter(adega=adega, data__gte=inicio, data__lte=fim)
         .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
+        .annotate(total_linha=total_linha_expr)
         .order_by("-data")
     )
 
-    total_linha_expr = ExpressionWrapper(
-        F("quantidade") * F("produto__preco_venda"),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
-    total = itens.annotate(total_linha=total_linha_expr).aggregate(total=Sum("total_linha"))["total"] or 0
+    total = itens.aggregate(total=Sum("total_linha"))["total"] or 0
 
     return render(request, "estoque/vendas_hoje.html", {
         "hoje": hoje,
@@ -304,13 +293,13 @@ def vendas_hoje(request):
 
 
 # =========================
-# VENDAS POR PERÍODO (ROBUSTO)
+# VENDAS POR PERÍODO (opcional - ainda existe)
 # =========================
 def vendas_periodo(request):
     adega = get_adega_atual(request)
 
     hoje = timezone.localdate()
-    padrao_inicio = hoje - timedelta(days=30)
+    padrao_inicio = hoje - timedelta(days=7)
     padrao_fim = hoje
 
     data_source = request.GET if request.method == "GET" else request.POST
@@ -325,11 +314,6 @@ def vendas_periodo(request):
     if data_inicio > data_fim:
         data_inicio, data_fim = data_fim, data_inicio
 
-    form = FiltroPeriodoVendasForm({
-        "data_inicio": _date_to_html(data_inicio),
-        "data_fim": _date_to_html(data_fim),
-    })
-
     tz = timezone.get_current_timezone()
     inicio = timezone.make_aware(datetime.combine(data_inicio, time.min), tz)
     fim = timezone.make_aware(datetime.combine(data_fim, time.max), tz)
@@ -343,7 +327,7 @@ def vendas_periodo(request):
         Movimentacao.objects
         .filter(adega=adega, data__gte=inicio, data__lte=fim)
         .exclude(tipo__iexact="ENTRADA")
-        .select_related("produto", "adega")
+        .select_related("produto")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
     )
@@ -351,6 +335,11 @@ def vendas_periodo(request):
     total = itens.aggregate(total=Sum("total_linha"))["total"] or 0
     total_itens = itens.aggregate(total=Sum("quantidade"))["total"] or 0
     numero_vendas = itens.count()
+
+    form = FiltroPeriodoVendasForm(initial={
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
+    })
 
     return render(request, "estoque/vendas_periodo.html", {
         "form": form,
