@@ -42,9 +42,7 @@ class NovoProdutoPorCodigoForm(forms.Form):
     codigo_barras = forms.CharField(
         label="Código de barras",
         max_length=60,
-        widget=forms.TextInput(attrs={
-            "readonly": True
-        })
+        widget=forms.TextInput(attrs={"readonly": True})
     )
     nome = forms.CharField(
         label="Nome do produto",
@@ -80,6 +78,7 @@ class FiltroEstoqueBaixoForm(forms.Form):
 
 
 class FiltroPeriodoVendasForm(forms.Form):
+    # ✅ Agora NÃO é obrigatório (relatório automático)
     data_inicio = forms.DateField(
         label="Data inicial",
         required=False,
@@ -91,11 +90,9 @@ class FiltroPeriodoVendasForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"})
     )
 
+    # ✅ Preenche automaticamente quando abre sem datas
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # ✅ Se o usuário não informou datas, preenche automático:
-        # últimos 7 dias até hoje
         if not self.data.get("data_inicio") and not self.data.get("data_fim"):
             hoje = timezone.localdate()
             self.initial["data_inicio"] = hoje - timedelta(days=7)
