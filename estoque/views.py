@@ -41,6 +41,11 @@ def _parse_date_value(value):
     return None
 
 
+def _date_to_html(d):
+    """Converte date -> string YYYY-MM-DD (formato que input type=date entende)."""
+    return d.strftime("%Y-%m-%d") if d else ""
+
+
 # =========================
 # ADEGA ATUAL (FIXA)
 # =========================
@@ -191,34 +196,31 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS (AUTOMÁTICO + POST/GET + CORRIGE DATA + ACEITA TIPOS DIFERENTES)
+# RELATÓRIOS (ROBUSTO: funciona mesmo com data invertida e tipo diferente)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
 
     hoje = timezone.localdate()
-    padrao_inicio = hoje - timedelta(days=7)
+    padrao_inicio = hoje - timedelta(days=30)  # 30 dias pra garantir
     padrao_fim = hoje
 
-    # ✅ aceita GET e POST
     data_source = request.GET if request.method == "GET" else request.POST
     dados = data_source.copy() if data_source else {}
 
-    # ✅ lê datas em qualquer formato e aplica padrão
     di_raw = dados.get("data_inicio")
     df_raw = dados.get("data_fim")
 
     data_inicio = _parse_date_value(di_raw) or padrao_inicio
     data_fim = _parse_date_value(df_raw) or padrao_fim
 
-    # ✅ se veio invertido, troca
     if data_inicio > data_fim:
         data_inicio, data_fim = data_fim, data_inicio
 
-    # form serve só pra renderizar campos preenchidos
+    # ✅ importante: enviar no formato YYYY-MM-DD para o input type=date
     form = FiltroPeriodoVendasForm({
-        "data_inicio": data_inicio,
-        "data_fim": data_fim,
+        "data_inicio": _date_to_html(data_inicio),
+        "data_fim": _date_to_html(data_fim),
     })
 
     tz = timezone.get_current_timezone()
@@ -230,12 +232,12 @@ def relatorios(request):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
 
-    # ✅ Aqui é o pulo do gato: pega vendas mesmo que o tipo esteja diferente
+    # ✅ robusto: pega tudo que NÃO é entrada, e restringe pela adega fixa
     itens = (
         Movimentacao.objects
         .filter(adega=adega, data__gte=inicio, data__lte=fim)
-        .filter(Q(tipo__iexact="SAIDA") | Q(tipo__iexact="SAÍDA") | Q(tipo__iexact="VENDA"))
-        .select_related("produto")
+        .exclude(tipo__iexact="ENTRADA")
+        .select_related("produto", "adega")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
     )
@@ -282,14 +284,17 @@ def vendas_hoje(request):
 
     itens = (
         Movimentacao.objects
-        .filter(adega=adega, tipo="SAIDA", data__gte=inicio, data__lte=fim)
+        .filter(adega=adega, data__gte=inicio, data__lte=fim)
+        .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
         .order_by("-data")
     )
 
-    total = itens.aggregate(
-        total=Sum(F("quantidade") * F("produto__preco_venda"))
-    )["total"] or 0
+    total_linha_expr = ExpressionWrapper(
+        F("quantidade") * F("produto__preco_venda"),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    total = itens.annotate(total_linha=total_linha_expr).aggregate(total=Sum("total_linha"))["total"] or 0
 
     return render(request, "estoque/vendas_hoje.html", {
         "hoje": hoje,
@@ -299,13 +304,13 @@ def vendas_hoje(request):
 
 
 # =========================
-# VENDAS POR PERÍODO (AUTOMÁTICO + CORRIGE DATA + ACEITA TIPOS DIFERENTES)
+# VENDAS POR PERÍODO (ROBUSTO)
 # =========================
 def vendas_periodo(request):
     adega = get_adega_atual(request)
 
     hoje = timezone.localdate()
-    padrao_inicio = hoje - timedelta(days=7)
+    padrao_inicio = hoje - timedelta(days=30)
     padrao_fim = hoje
 
     data_source = request.GET if request.method == "GET" else request.POST
@@ -321,8 +326,8 @@ def vendas_periodo(request):
         data_inicio, data_fim = data_fim, data_inicio
 
     form = FiltroPeriodoVendasForm({
-        "data_inicio": data_inicio,
-        "data_fim": data_fim,
+        "data_inicio": _date_to_html(data_inicio),
+        "data_fim": _date_to_html(data_fim),
     })
 
     tz = timezone.get_current_timezone()
@@ -337,8 +342,8 @@ def vendas_periodo(request):
     itens = (
         Movimentacao.objects
         .filter(adega=adega, data__gte=inicio, data__lte=fim)
-        .filter(Q(tipo__iexact="SAIDA") | Q(tipo__iexact="SAÍDA") | Q(tipo__iexact="VENDA"))
-        .select_related("produto")
+        .exclude(tipo__iexact="ENTRADA")
+        .select_related("produto", "adega")
         .annotate(total_linha=total_linha_expr)
         .order_by("-data")
     )
