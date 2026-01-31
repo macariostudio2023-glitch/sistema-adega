@@ -269,3 +269,42 @@ def consultar_estoque(request):
     ]
 
     return JsonResponse(dados, safe=False)
+def vendas_hoje(request):
+    # ✅ reapareceu só pra não quebrar seu urls.py
+    # e já funciona como “vendas do dia”
+    adega = get_adega_atual(request)
+
+    hoje = timezone.localdate()
+    tz = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(hoje, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(hoje, time.max), tz)
+
+    itens_qs = (
+        Movimentacao.objects
+        .filter(adega=adega, data__gte=inicio, data__lte=fim)
+        .exclude(tipo__iexact="ENTRADA")
+        .select_related("produto")
+        .order_by("-data")
+    )
+
+    itens = []
+    total = 0.0
+
+    for m in itens_qs:
+        preco = float(m.produto.preco_venda)
+        qtd = int(m.quantidade)
+        total_linha = qtd * preco
+        itens.append({
+            "data": m.data,
+            "produto_nome": m.produto.nome,
+            "quantidade": qtd,
+            "preco_venda": preco,
+            "total_linha": total_linha,
+        })
+        total += total_linha
+
+    return render(request, "estoque/vendas_hoje.html", {
+        "hoje": hoje,
+        "itens": itens,
+        "total": total,
+    })
