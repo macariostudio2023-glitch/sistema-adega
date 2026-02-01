@@ -194,7 +194,7 @@
     <a href="/entrada-codigo/">📦 Entrada</a>
     <a href="/saida-codigo/">🧾 Saída</a>
     <a href="/relatorios/">📊 Relatórios</a>
-    <a href="#" onclick="entrarAdmin()">⚙️ Admin</a>
+    <a href="/admin/">⚙️ Admin</a>
   </div>
   {% endblock %}
 
@@ -215,17 +215,5 @@
 
 </div>
 
-<script>
-  function entrarAdmin(){
-    const senha = prompt("Digite a senha para acessar o Admin:");
-    if(senha === "adega12345678"){
-      window.location.href = "/admin/";
-    }else if(senha !== null){
-      alert("Senha incorreta!");
-    }
-  }
-</script>
-
 </body>
 </html>
-
