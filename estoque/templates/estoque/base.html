@@ -11,173 +11,84 @@
       margin:0;
       font-family: Arial, sans-serif;
       color:#ffffff;
-
       background:
-        linear-gradient(
-          rgba(0,0,0,0.72),
-          rgba(0,0,0,0.72)
-        ),
+        linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.72)),
         url("https://images.unsplash.com/photo-1544148103-0773bf10d330");
-
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
       min-height:100vh;
     }
 
-    .wrap{
-      max-width:900px;
-      margin:0 auto;
-      padding:20px;
-      text-align:center;
-    }
-
-    /* 🔥 TÍTULO */
-    .hero-title{
-      margin: 18px 0 14px 0;
-    }
+    .wrap{max-width:900px;margin:0 auto;padding:20px;text-align:center;}
 
     .hero-title h1{
-      margin:0;
+      margin:18px 0 14px;
       font-size:32px;
       font-weight:900;
       letter-spacing:2px;
       text-transform:uppercase;
-      text-shadow:
-        0 0 12px rgba(37,99,235,.55),
-        0 0 28px rgba(37,99,235,.35);
+      text-shadow:0 0 12px rgba(37,99,235,.55),0 0 28px rgba(37,99,235,.35);
     }
 
-    /* MENU */
     .menu{
-      display:flex;
-      flex-wrap:wrap;
-      gap:16px;
-      justify-content:center;
-      margin: 14px auto 24px auto;
+      display:flex;flex-wrap:wrap;gap:16px;justify-content:center;
+      margin:14px auto 24px;
     }
 
     .menu a{
       text-decoration:none;
       background:rgba(17,24,39,0.9);
-      color:#ffffff;
+      color:#fff;
       padding:16px 20px;
       border-radius:14px;
       font-weight:bold;
-      transition: all 0.2s ease;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
+      transition:.2s;
       min-width:130px;
     }
 
-    .menu a:hover{
-      background:#2563eb;
-      transform: translateY(-2px);
-    }
+    .menu a:hover{background:#2563eb;transform:translateY(-2px);}
 
-    /* CARD */
     .card{
       background:rgba(17,24,39,0.92);
-      padding:24px;
-      border-radius:16px;
-      box-shadow: 0 10px 35px rgba(0,0,0,0.55);
-      margin: 0 auto;
+      padding:24px;border-radius:16px;
+      box-shadow:0 10px 35px rgba(0,0,0,.55);
       text-align:left;
     }
 
-    label{
-      display:block;
-      margin-top:14px;
-      font-weight:bold;
+    input,button{
+      width:100%;padding:14px;margin-top:10px;
+      border-radius:10px;border:none;font-size:16px;
     }
 
-    input, select, button{
-      width:100%;
-      padding:14px;
-      font-size:16px;
-      margin-top:8px;
-      border-radius:10px;
-      border:none;
-      box-sizing: border-box;
+    input{background:#020617;color:#fff;border:1px solid #1f2937;}
+    button{background:#2563eb;color:#fff;font-weight:bold;cursor:pointer;}
+    button:hover{background:#1d4ed8;}
+
+    /* 🔒 MODAL ADMIN */
+    .modal{
+      position:fixed;inset:0;
+      background:rgba(0,0,0,.75);
+      display:none;align-items:center;justify-content:center;
+      z-index:9999;
     }
 
-    input, select{
+    .modal-box{
       background:#020617;
-      color:#ffffff;
-      border:1px solid #1f2937;
-    }
-
-    button{
-      background:#2563eb;
-      color:white;
-      font-weight:bold;
-      cursor:pointer;
-      margin-top:18px;
-    }
-
-    button:hover{
-      background:#1d4ed8;
-    }
-
-    /* 🔔 MENSAGENS DO DJANGO */
-    .messages{
-      list-style:none;
-      padding:0;
-      margin:16px auto;
-      max-width:700px;
+      padding:26px;
+      border-radius:16px;
+      width:100%;max-width:380px;
       text-align:center;
+      box-shadow:0 0 30px rgba(0,0,0,.7);
     }
 
-    .messages li{
-      padding:14px 18px;
-      margin-bottom:10px;
-      border-radius:10px;
-      font-weight:600;
-    }
+    .modal-box h3{margin-top:0;}
+    .modal-actions{display:flex;gap:10px;margin-top:14px;}
+    .modal-actions button{flex:1;}
+    .cancel{background:#374151;}
+    .cancel:hover{background:#4b5563;}
 
-    .messages li.success{
-      background:#064e3b;
-      color:#ecfeff;
-    }
-
-    .messages li.error{
-      background:#7f1d1d;
-      color:#fee2e2;
-    }
-
-    .messages li.warning{
-      background:#78350f;
-      color:#ffedd5;
-    }
-
-    /* CENTRALIZAÇÃO */
-    .center-screen{
-      display:flex;
-      justify-content:center;
-      margin-top:60px;
-      width:100%;
-    }
-
-    .center-screen .card{
-      max-width:900px;
-      width:100%;
-    }
-
-    .centered-card{
-      text-align:center;
-    }
-
-    .centered-card label{
-      text-align:left;
-    }
-
-    @media (max-width: 600px){
-      .wrap{ padding:14px; }
-      .hero-title h1{ font-size:20px; }
-      .menu a{ width:100%; }
-      .center-screen{ margin-top:24px; }
-    }
+    .error-msg{color:#fca5a5;font-size:14px;margin-top:8px;display:none;}
   </style>
 </head>
 
@@ -189,16 +100,13 @@
     <h1>SISTEMA DE CADASTRO DA ADEGA</h1>
   </div>
 
-  {% block top_menu %}
   <div class="menu">
     <a href="/entrada-codigo/">📦 Entrada</a>
     <a href="/saida-codigo/">🧾 Saída</a>
     <a href="/relatorios/">📊 Relatórios</a>
-    <a href="/admin/">⚙️ Admin</a>
+    <a href="#" onclick="abrirAdmin()">⚙️ Admin</a>
   </div>
-  {% endblock %}
 
-  <!-- 🔔 MENSAGENS -->
   {% if messages %}
     <ul class="messages">
       {% for message in messages %}
@@ -207,13 +115,49 @@
     </ul>
   {% endif %}
 
-  <div class="{% block page_wrapper_class %}{% endblock %}">
-    <div class="card">
-      {% block content %}{% endblock %}
-    </div>
+  <div class="card">
+    {% block content %}{% endblock %}
   </div>
 
 </div>
 
+<!-- 🔒 MODAL -->
+<div class="modal" id="modalAdmin">
+  <div class="modal-box">
+    <h3>🔐 Acesso ao Admin</h3>
+    <input type="password" id="senhaAdmin" placeholder="Digite a senha">
+    <div class="error-msg" id="erroSenha">Senha incorreta</div>
+    <div class="modal-actions">
+      <button onclick="entrarAdmin()">OK</button>
+      <button class="cancel" onclick="fecharAdmin()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SENHA_ADMIN = "adega12345678"; // ⚠️ VISUAL, não segurança real
+
+  function abrirAdmin(){
+    document.getElementById("modalAdmin").style.display="flex";
+    document.getElementById("senhaAdmin").value="";
+    document.getElementById("erroSenha").style.display="none";
+    document.getElementById("senhaAdmin").focus();
+  }
+
+  function fecharAdmin(){
+    document.getElementById("modalAdmin").style.display="none";
+  }
+
+  function entrarAdmin(){
+    const senha = document.getElementById("senhaAdmin").value;
+    if(senha === SENHA_ADMIN){
+      window.location.href="/admin/";
+    }else{
+      document.getElementById("erroSenha").style.display="block";
+    }
+  }
+</script>
+
 </body>
 </html>
+

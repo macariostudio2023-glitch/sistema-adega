@@ -37,8 +37,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "estoque.middleware.AdminGateMiddleware",  # 🔐 gate do admin (OBRIGATÓRIO)
+
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # ✅ Admin com CSS no Render
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # CSS do admin no Render
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -87,6 +89,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+ADMIN_GATE_PASSWORD = os.environ.get("ADMIN_GATE_PASSWORD", "")
 
 # Internationalization (Brasil)
 LANGUAGE_CODE = 'pt-br'
