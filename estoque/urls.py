@@ -11,6 +11,7 @@ from .views import (
     consultar_estoque,
     baixar_relatorio,
     limpar_relatorio,
+    admin_gate_check,   # ✅ ADICIONA ESSE
 )
 
 urlpatterns = [
@@ -33,6 +34,9 @@ urlpatterns = [
     # Ações do relatório
     path("relatorio/baixar/", baixar_relatorio, name="baixar_relatorio"),
     path("relatorio/limpar/", limpar_relatorio, name="limpar_relatorio"),
+
+    # 🔐 GATE DO ADMIN (ESSA ROTA ESTAVA FALTANDO)
+    path("admin-gate-check/", admin_gate_check, name="admin_gate_check"),
 ]
 
 

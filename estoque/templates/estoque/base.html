@@ -6,6 +6,9 @@
 
   <title>{% block title %}Sistema Adega{% endblock %}</title>
 
+  <!-- ✅ CSRF para o fetch POST -->
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
   <style>
     body{
       margin:0;
@@ -45,6 +48,9 @@
       font-weight:bold;
       transition:.2s;
       min-width:130px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
     }
 
     .menu a:hover{background:#2563eb;transform:translateY(-2px);}
@@ -54,11 +60,13 @@
       padding:24px;border-radius:16px;
       box-shadow:0 10px 35px rgba(0,0,0,.55);
       text-align:left;
+      margin: 0 auto;
     }
 
     input,button{
       width:100%;padding:14px;margin-top:10px;
       border-radius:10px;border:none;font-size:16px;
+      box-sizing: border-box;
     }
 
     input{background:#020617;color:#fff;border:1px solid #1f2937;}
@@ -104,7 +112,7 @@
     <a href="/entrada-codigo/">📦 Entrada</a>
     <a href="/saida-codigo/">🧾 Saída</a>
     <a href="/relatorios/">📊 Relatórios</a>
-    <a href="#" onclick="abrirAdmin()">⚙️ Admin</a>
+    <a href="#" onclick="abrirAdmin(); return false;">⚙️ Admin</a>
   </div>
 
   {% if messages %}
@@ -135,12 +143,12 @@
 </div>
 
 <script>
-  const SENHA_ADMIN = "adega12345678"; // ⚠️ VISUAL, não segurança real
-
   function abrirAdmin(){
     document.getElementById("modalAdmin").style.display="flex";
     document.getElementById("senhaAdmin").value="";
-    document.getElementById("erroSenha").style.display="none";
+    const erro = document.getElementById("erroSenha");
+    erro.style.display="none";
+    erro.textContent="Senha incorreta";
     document.getElementById("senhaAdmin").focus();
   }
 
@@ -148,16 +156,49 @@
     document.getElementById("modalAdmin").style.display="none";
   }
 
-  function entrarAdmin(){
-    const senha = document.getElementById("senhaAdmin").value;
-    if(senha === SENHA_ADMIN){
-      window.location.href="/admin/";
-    }else{
-      document.getElementById("erroSenha").style.display="block";
+  function getCSRFToken(){
+    const el = document.querySelector('meta[name="csrf-token"]');
+    return el ? el.getAttribute("content") : "";
+  }
+
+  async function entrarAdmin(){
+    const senha = document.getElementById("senhaAdmin").value || "";
+    const erro = document.getElementById("erroSenha");
+    erro.style.display = "none";
+
+    const formData = new FormData();
+    formData.append("senha", senha);
+
+    let resp;
+    try {
+      resp = await fetch("/admin-gate-check/", {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin", // ✅ manda cookie da sessão
+        headers: {
+          "X-CSRFToken": getCSRFToken() // ✅ evita 403 CSRF
+        }
+      });
+    } catch (e) {
+      erro.textContent = "Falha de conexão. Veja o terminal.";
+      erro.style.display = "block";
+      return;
     }
+
+    if (resp.status === 200) {
+      window.location.href = "/admin/";
+      return;
+    }
+
+    // ✅ Agora você vai ver o motivo REAL
+    if (resp.status === 401) erro.textContent = "Senha incorreta (401)";
+    else if (resp.status === 403) erro.textContent = "Bloqueado por CSRF (403)";
+    else erro.textContent = `Erro no servidor (${resp.status})`;
+
+    erro.style.display = "block";
+    console.log("admin-gate-check status:", resp.status);
   }
 </script>
 
 </body>
 </html>
-

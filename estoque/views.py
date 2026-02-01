@@ -416,16 +416,24 @@ def limpar_relatorio(request):
     return redirect("relatorios")
 
 
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+
 # =========================
 # 🔐 GATE DO ADMIN (BACKEND)
 # =========================
 @csrf_exempt
 @require_POST
 def admin_gate_check(request):
-    senha = request.POST.get("senha", "")
+    senha = request.POST.get("senha", "").strip()
+
     if settings.ADMIN_GATE_PASSWORD and senha == settings.ADMIN_GATE_PASSWORD:
         request.session["admin_gate_ok"] = True
-        return JsonResponse({"ok": True})
+        return JsonResponse({"ok": True}, status=200)
+
     return JsonResponse({"ok": False}, status=401)
+
 
 
