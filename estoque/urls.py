@@ -9,6 +9,8 @@ from .views import (
     vendas_hoje,
     vendas_periodo,
     consultar_estoque,
+    baixar_relatorio,
+    limpar_relatorio,
 )
 
 urlpatterns = [
@@ -27,6 +29,10 @@ urlpatterns = [
     path("relatorios/estoque-baixo/", estoque_baixo, name="estoque_baixo"),
     path("relatorios/vendas-hoje/", vendas_hoje, name="vendas_hoje"),
     path("relatorios/vendas-periodo/", vendas_periodo, name="vendas_periodo"),
+
+    # Ações do relatório
+    path("relatorio/baixar/", baixar_relatorio, name="baixar_relatorio"),
+    path("relatorio/limpar/", limpar_relatorio, name="limpar_relatorio"),
 ]
 
 
