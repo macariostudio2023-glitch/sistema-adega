@@ -339,6 +339,11 @@ def vendas_hoje(request):
     })
 
 
+# ✅ FALTAVA ESSA VIEW (compatível com seu urls.py)
+def vendas_periodo(request):
+    return relatorios(request)
+
+
 # =========================
 # BAIXAR RELATÓRIO CSV
 # =========================
@@ -422,4 +427,5 @@ def admin_gate_check(request):
         request.session["admin_gate_ok"] = True
         return JsonResponse({"ok": True})
     return JsonResponse({"ok": False}, status=401)
+
 
