@@ -10,6 +10,21 @@
     Período: <b>{{ inicio_mes|date:"d/m/Y" }}</b> até <b>{{ hoje|date:"d/m/Y" }}</b>
   </p>
 
+  <!-- ✅ AÇÕES -->
+  <div class="acoes">
+    <a href="{% url 'baixar_relatorio' %}" class="btn btn-download">
+      ⬇️ Baixar
+    </a>
+
+    <form method="post" action="{% url 'limpar_relatorio' %}" class="form-limpar">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger"
+        onclick="return confirm('Tem certeza que deseja LIMPAR as vendas do mês? Isso apaga as SAÍDAS do mês atual.')">
+        🧹 Limpar
+      </button>
+    </form>
+  </div>
+
   <!-- RESUMO -->
   <div class="cards">
     <div class="card resumo">
@@ -94,5 +109,39 @@ h2, h3 { color: #f9fafb; }
 .tabela th { text-align: left; font-size: 13px; color: #cbd5e1; }
 
 .vazio { text-align: center; color: #cbd5e1; padding: 20px; }
+
+/* ✅ BOTÕES */
+.acoes {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0 18px;
+}
+
+.btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-download {
+  background: #22c55e;
+  color: #052e16;
+}
+.btn-download:hover { background: #16a34a; }
+
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+}
+.btn-danger:hover { background: #dc2626; }
+
+.form-limpar { margin: 0; }
 </style>
 {% endblock %}

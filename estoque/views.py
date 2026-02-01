@@ -1,12 +1,14 @@
 from datetime import datetime, time
 from decimal import Decimal, ROUND_HALF_UP
+import csv
 
 from django.db import transaction
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_POST
 
 from .models import Adega, Produto, Movimentacao
 from .forms import (
@@ -349,3 +351,71 @@ def vendas_hoje(request):
 # =========================
 def vendas_periodo(request):
     return relatorios(request)
+
+
+# =========================
+# ✅ NOVO: BAIXAR RELATÓRIO (CSV) - MÊS ATUAL
+# =========================
+def baixar_relatorio(request):
+    adega = get_adega_atual(request)
+
+    hoje = timezone.localdate()
+    inicio_mes = hoje.replace(day=1)
+
+    dt_inicio, _ = _range_dia(inicio_mes)
+    _, dt_fim = _range_dia(hoje)
+
+    itens_qs = (
+        Movimentacao.objects
+        .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
+        .exclude(tipo__iexact="ENTRADA")
+        .select_related("produto")
+        .order_by("-data")
+    )
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="relatorio_{inicio_mes.strftime("%Y_%m")}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
+
+    for m in itens_qs:
+        preco = _money(_to_decimal(m.produto.preco_venda))
+        qtd = int(m.quantidade)
+        total_linha = _money(preco * _to_decimal(qtd))
+
+        writer.writerow([
+            m.data.strftime("%d/%m/%Y %H:%M") if m.data else "",
+            m.produto.nome,
+            qtd,
+            f"{preco}",
+            f"{total_linha}",
+            m.tipo,
+        ])
+
+    return response
+
+
+# =========================
+# ✅ NOVO: LIMPAR RELATÓRIO - APAGA SAÍDAS DO MÊS ATUAL
+# =========================
+@require_POST
+def limpar_relatorio(request):
+    adega = get_adega_atual(request)
+
+    hoje = timezone.localdate()
+    inicio_mes = hoje.replace(day=1)
+
+    dt_inicio, _ = _range_dia(inicio_mes)
+    _, dt_fim = _range_dia(hoje)
+
+    apagados, _ = (
+        Movimentacao.objects
+        .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
+        .exclude(tipo__iexact="ENTRADA")
+        .delete()
+    )
+
+    messages.success(request, f"✅ Relatório limpo. Registros removidos: {apagados}")
+    return redirect("relatorios")
+
