@@ -67,15 +67,17 @@
 </div>
 
 <style>
-.container { max-width: 1100px; }
-.text-muted { color: #6b7280; margin-bottom: 16px; }
+.container { max-width: 1100px; padding: 22px; border-radius: 14px; background: rgba(17, 24, 39, 0.88); }
+h2, h3 { color: #f9fafb; }
+.text-muted { color: #cbd5e1; margin-bottom: 16px; }
 
 .card {
-  background: #fff;
+  background: rgba(31, 41, 55, 0.92);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,.05);
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  color: #f9fafb;
 }
 
 .cards {
@@ -84,13 +86,13 @@
   gap: 16px;
 }
 
-.resumo span { font-size: 13px; color: #6b7280; }
-.resumo strong { font-size: 22px; }
+.resumo span { font-size: 13px; color: #cbd5e1; }
+.resumo strong { font-size: 22px; color: #ffffff; }
 
 .tabela table { width: 100%; border-collapse: collapse; }
-.tabela th, .tabela td { padding: 10px; border-bottom: 1px solid #eee; }
-.tabela th { text-align: left; font-size: 13px; color: #6b7280; }
+.tabela th, .tabela td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.12); color: #f9fafb; }
+.tabela th { text-align: left; font-size: 13px; color: #cbd5e1; }
 
-.vazio { text-align: center; color: #6b7280; padding: 20px; }
+.vazio { text-align: center; color: #cbd5e1; padding: 20px; }
 </style>
 {% endblock %}
