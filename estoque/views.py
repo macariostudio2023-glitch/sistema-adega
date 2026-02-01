@@ -11,6 +11,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.contrib.auth.decorators import login_required  # ✅ Importado para segurança
 
 from .models import Adega, Produto, Movimentacao
 from .forms import (
@@ -61,6 +62,7 @@ def home(request):
 # =========================
 # ENTRADA POR CÓDIGO
 # =========================
+@login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
     form = EntradaCodigoBarrasForm(request.POST or None)
@@ -101,6 +103,7 @@ def entrada_codigo_barras(request):
 # =========================
 # SAÍDA POR CÓDIGO
 # =========================
+@login_required
 def saida_codigo_barras(request):
     adega = get_adega_atual(request)
     form = SaidaCodigoBarrasForm(request.POST or None)
@@ -151,6 +154,7 @@ def saida_codigo_barras(request):
 # =========================
 # NOVO PRODUTO
 # =========================
+@login_required
 def novo_produto(request):
     adega = get_adega_atual(request)
 
@@ -193,6 +197,7 @@ def novo_produto(request):
 # =========================
 # RELATÓRIOS
 # =========================
+@login_required
 def relatorios(request):
     adega = get_adega_atual(request)
 
@@ -248,6 +253,7 @@ def relatorios(request):
 # =========================
 # ESTOQUE BAIXO
 # =========================
+@login_required
 def estoque_baixo(request):
     adega = get_adega_atual(request)
     form = FiltroEstoqueBaixoForm(request.GET or None)
@@ -268,6 +274,7 @@ def estoque_baixo(request):
 # =========================
 # CONSULTA DE ESTOQUE
 # =========================
+@login_required
 def consultar_estoque(request):
     adega = get_adega_atual(request)
     termo = request.GET.get("q", "").strip()
@@ -298,6 +305,7 @@ def consultar_estoque(request):
 # =========================
 # VENDAS HOJE
 # =========================
+@login_required
 def vendas_hoje(request):
     adega = get_adega_atual(request)
 
@@ -339,7 +347,7 @@ def vendas_hoje(request):
     })
 
 
-# ✅ FALTAVA ESSA VIEW (compatível com seu urls.py)
+@login_required
 def vendas_periodo(request):
     return relatorios(request)
 
@@ -347,6 +355,7 @@ def vendas_periodo(request):
 # =========================
 # BAIXAR RELATÓRIO CSV
 # =========================
+@login_required
 def baixar_relatorio(request):
     adega = get_adega_atual(request)
 
@@ -392,6 +401,7 @@ def baixar_relatorio(request):
 # =========================
 # LIMPAR RELATÓRIO
 # =========================
+@login_required
 @require_POST
 def limpar_relatorio(request):
     adega = get_adega_atual(request)
@@ -416,13 +426,8 @@ def limpar_relatorio(request):
     return redirect("relatorios")
 
 
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-
 # =========================
-# 🔐 GATE DO ADMIN (BACKEND)
+# 🔐 GATE DO ADMIN (MANTIDO)
 # =========================
 @csrf_exempt
 @require_POST
@@ -434,6 +439,5 @@ def admin_gate_check(request):
         return JsonResponse({"ok": True}, status=200)
 
     return JsonResponse({"ok": False}, status=401)
-
 
 

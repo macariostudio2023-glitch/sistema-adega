@@ -107,3 +107,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # =========================
 # Certifica-te de que esta variável está no painel "Environment" do Render
 ADMIN_GATE_PASSWORD = os.environ.get("ADMIN_GATE_PASSWORD", "")
+
+# =========================
+# 🛡️ CONFIGURAÇÕES DE ACESSO (Obrigatório para o login funcionar)
+# =========================
+# Quando alguém tenta acessar sem estar logado, é enviado para aqui:
+LOGIN_URL = '/admin/login/'
+
+# Após o login com sucesso, o usuário cai nesta página:
+LOGIN_REDIRECT_URL = '/entrada-codigo/'
