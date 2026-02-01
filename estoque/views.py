@@ -1,4 +1,5 @@
 from datetime import datetime, time
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 from django.shortcuts import render, redirect
@@ -14,6 +15,32 @@ from .forms import (
     NovoProdutoPorCodigoForm,
     FiltroEstoqueBaixoForm,
 )
+
+# =========================
+# HELPERS
+# =========================
+def _to_decimal(value) -> Decimal:
+    """
+    Garante Decimal (evita bug de float).
+    """
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+def _money(value: Decimal) -> Decimal:
+    """
+    Arredonda para 2 casas (dinheiro).
+    """
+    return _to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def _range_dia(uma_data):
+    tz = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(uma_data, time.min), tz)
+    fim = timezone.make_aware(datetime.combine(uma_data, time.max), tz)
+    return inicio, fim
+
 
 # =========================
 # ADEGA ATUAL (FIXA)
@@ -53,20 +80,22 @@ def entrada_codigo_barras(request):
         except Produto.DoesNotExist:
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
 
+        # ✅ FIX: garante data preenchida
         Movimentacao.objects.create(
             adega=adega,
             produto=produto,
             tipo="ENTRADA",
             quantidade=quantidade,
+            data=timezone.now(),
             observacao="Entrada via leitor de código de barras"
         )
 
-        valor_total = quantidade * produto.preco_custo
+        valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_custo))
         messages.success(
             request,
             f"✅ Entrada registrada com sucesso!\n"
             f"{produto.nome}\n"
-            f"R$ {valor_total:.2f}"
+            f"R$ {valor_total}"
         )
 
         form = EntradaCodigoBarrasForm()
@@ -101,20 +130,22 @@ def saida_codigo_barras(request):
                 messages.error(request, f"Estoque insuficiente. Atual: {produto.estoque_atual}")
                 return render(request, "estoque/saida_codigo.html", {"form": form})
 
+            # ✅ FIX: garante data preenchida
             Movimentacao.objects.create(
                 adega=adega,
                 produto=produto,
                 tipo="SAIDA",
                 quantidade=quantidade,
+                data=timezone.now(),
                 observacao="Saída via leitor de código de barras"
             )
 
-        valor_total = quantidade * produto.preco_venda
+        valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_venda))
         messages.success(
             request,
             f"✅ Venda registrada com sucesso!\n"
             f"{produto.nome}\n"
-            f"R$ {valor_total:.2f}"
+            f"R$ {valor_total}"
         )
 
         form = SaidaCodigoBarrasForm()
@@ -165,7 +196,7 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIO DO MÊS (SIMPLÃO, SEM FORM, FUNCIONA SEMPRE)
+# RELATÓRIO DO MÊS (SEM FORM)
 # =========================
 def relatorios(request):
     adega = get_adega_atual(request)
@@ -173,11 +204,9 @@ def relatorios(request):
     hoje = timezone.localdate()
     inicio_mes = hoje.replace(day=1)
 
-    tz = timezone.get_current_timezone()
-    dt_inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
-    dt_fim = timezone.make_aware(datetime.combine(hoje, time.max), tz)
+    dt_inicio, _ = _range_dia(inicio_mes)
+    _, dt_fim = _range_dia(hoje)
 
-    # ✅ Pega tudo do mês que NÃO é ENTRADA (então pega SAIDA / VENDA / etc.)
     itens_qs = (
         Movimentacao.objects
         .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
@@ -186,15 +215,14 @@ def relatorios(request):
         .order_by("-data")
     )
 
-    # ✅ Calcula tudo no Python (mais simples, não depende de annotate / banco)
     itens = []
-    total_vendido = 0
+    total_vendido = Decimal("0.00")
     total_itens = 0
 
     for m in itens_qs:
-        preco = float(m.produto.preco_venda)
+        preco = _money(_to_decimal(m.produto.preco_venda))
         qtd = int(m.quantidade)
-        total_linha = qtd * preco
+        total_linha = _money(preco * _to_decimal(qtd))
 
         itens.append({
             "data": m.data,
@@ -202,15 +230,16 @@ def relatorios(request):
             "quantidade": qtd,
             "preco_venda": preco,
             "total_linha": total_linha,
+            "tipo": m.tipo,
         })
 
         total_vendido += total_linha
         total_itens += qtd
 
     resumo = {
-        "total_vendido": total_vendido,
+        "total_vendido": _money(total_vendido),
         "total_itens": total_itens,
-        "total_vendas": len(itens),
+        "total_vendas": itens_qs.count(),
     }
 
     return render(request, "estoque/relatorios.html", {
@@ -263,21 +292,22 @@ def consultar_estoque(request):
             "nome": p.nome,
             "codigo": p.codigo_barras,
             "estoque": p.estoque_atual,
-            "preco": str(p.preco_venda),
+            "preco": str(_money(_to_decimal(p.preco_venda))),
         }
         for p in produtos
     ]
 
     return JsonResponse(dados, safe=False)
+
+
+# =========================
+# VENDAS HOJE (compatível com urls.py)
+# =========================
 def vendas_hoje(request):
-    # ✅ reapareceu só pra não quebrar seu urls.py
-    # e já funciona como “vendas do dia”
     adega = get_adega_atual(request)
 
     hoje = timezone.localdate()
-    tz = timezone.get_current_timezone()
-    inicio = timezone.make_aware(datetime.combine(hoje, time.min), tz)
-    fim = timezone.make_aware(datetime.combine(hoje, time.max), tz)
+    inicio, fim = _range_dia(hoje)
 
     itens_qs = (
         Movimentacao.objects
@@ -288,27 +318,34 @@ def vendas_hoje(request):
     )
 
     itens = []
-    total = 0.0
+    total = Decimal("0.00")
 
     for m in itens_qs:
-        preco = float(m.produto.preco_venda)
+        preco = _money(_to_decimal(m.produto.preco_venda))
         qtd = int(m.quantidade)
-        total_linha = qtd * preco
+        total_linha = _money(preco * _to_decimal(qtd))
+
         itens.append({
             "data": m.data,
             "produto_nome": m.produto.nome,
             "quantidade": qtd,
             "preco_venda": preco,
             "total_linha": total_linha,
+            "tipo": m.tipo,
         })
+
         total += total_linha
 
     return render(request, "estoque/vendas_hoje.html", {
         "hoje": hoje,
         "itens": itens,
-        "total": total,
+        "total": _money(total),
+        "total_vendas": itens_qs.count(),
     })
+
+
+# =========================
+# VENDAS PERÍODO (compatível com urls.py)
+# =========================
 def vendas_periodo(request):
-    # ✅ Só existe pra não quebrar seu urls.py no Render.
-    # Aqui vamos reaproveitar o relatório do mês atual.
     return relatorios(request)
