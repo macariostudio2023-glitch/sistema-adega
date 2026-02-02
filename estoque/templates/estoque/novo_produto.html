@@ -2,50 +2,81 @@
 {% block title %}Novo Produto - Sistema Adega{% endblock %}
 
 {% block content %}
-  <h2>🆕 Cadastrar Produto</h2>
-  <p>Esse código não existe ainda. Cadastre para continuar.</p>
 
-  {% if messages %}
-    <ul class="messages">
-      {% for message in messages %}
-        <li class="msg {% if message.tags == 'error' %}msg-error{% endif %}{% if message.tags == 'success' %}msg-success{% endif %}">
-          {{ message }}
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
+<style>
+  /* 🔒 correção de layout: cada campo em uma linha */
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    margin-bottom: 6px;
+  }
+  .field input,
+  .field select {
+    display: block;
+    width: 100%;
+  }
+</style>
 
-  {% if form %}
-    <form method="post">
-      {% csrf_token %}
+<h2>🆕 Cadastrar Produto</h2>
+<p>Esse código não existe ainda. Cadastre para continuar.</p>
 
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="msg {% if message.tags == 'error' %}msg-error{% endif %}{% if message.tags == 'success' %}msg-success{% endif %}">
+        {{ message }}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if form %}
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="field">
       <label>Código de barras</label>
       {{ form.codigo_barras }}
+    </div>
 
+    <div class="field">
       <label>Nome do produto</label>
       {{ form.nome }}
+    </div>
 
+    <div class="field">
       <label>Categoria</label>
       {{ form.categoria }}
+    </div>
 
+    <!-- ✅ agora o custo fica sempre ABAIXO -->
+    <div class="field">
       <label>Preço de custo</label>
       {{ form.preco_custo }}
+    </div>
 
+    <div class="field">
       <label>Preço de venda</label>
       {{ form.preco_venda }}
+    </div>
 
+    <div class="field">
       <label>Estoque inicial</label>
       {{ form.estoque_inicial }}
+    </div>
 
-      <div class="actions">
-        <button class="confirm" type="submit">Salvar Produto</button>
-      </div>
+    <div class="actions">
+      <button class="confirm" type="submit">Salvar Produto</button>
+    </div>
 
-      <div class="hint">
-        Após salvar, você volta automaticamente para continuar a operação.
-      </div>
-    </form>
-  {% else %}
-    <p>Não foi possível abrir o cadastro (faltou o código).</p>
-  {% endif %}
+    <div class="hint">
+      Após salvar, você volta automaticamente para continuar a operação.
+    </div>
+  </form>
+{% else %}
+  <p>Não foi possível abrir o cadastro (faltou o código).</p>
+{% endif %}
+
 {% endblock %}
