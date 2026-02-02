@@ -353,7 +353,7 @@ def vendas_periodo(request):
 
 
 # =========================
-# BAIXAR RELATÓRIO CSV (MELHORADO)
+# BAIXAR RELATÓRIO CSV (MELHORADO + HORA CERTA)
 # =========================
 @login_required
 def baixar_relatorio(request):
@@ -370,7 +370,7 @@ def baixar_relatorio(request):
         .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
         .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
-        .order_by("data")  # ✅ mais organizado no CSV
+        .order_by("data")
     )
 
     response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -383,15 +383,17 @@ def baixar_relatorio(request):
 
     # ✅ separador ; (Excel pt-BR não bagunça)
     writer = csv.writer(response, delimiter=";")
-    writer.writerow(["Data", "Horário", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
+    writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
 
     for m in itens_qs:
         preco = _money(_to_decimal(m.produto.preco_venda))
         qtd = int(m.quantidade)
         total_linha = _money(preco * _to_decimal(qtd))
 
+        dt = timezone.localtime(m.data) if m.data else None
+
         writer.writerow([
-            m.data.strftime("%d/%m/%Y %H:%M") if m.data else "",
+            dt.strftime("%d/%m/%Y %H:%M") if dt else "",
             m.produto.nome,
             qtd,
             f"{preco:.2f}".replace(".", ","),
