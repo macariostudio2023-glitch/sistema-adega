@@ -1,6 +1,7 @@
 from datetime import datetime, time
 from decimal import Decimal, ROUND_HALF_UP
 import csv
+import calendar
 
 from django.db import transaction
 from django.shortcuts import render, redirect
@@ -11,7 +12,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from django.contrib.auth.decorators import login_required  # ✅ Importado para segurança
+from django.contrib.auth.decorators import login_required
 
 from .models import Adega, Produto, Movimentacao
 from .forms import (
@@ -40,6 +41,17 @@ def _range_dia(uma_data):
     fim = timezone.make_aware(datetime.combine(uma_data, time.max), tz)
     return inicio, fim
 
+def _get_range_mes_atual():
+    """Helper para pegar o primeiro e último momento do mês atual"""
+    tz = timezone.get_current_timezone()
+    hoje = timezone.localdate()
+    inicio_mes = hoje.replace(day=1)
+    ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+    fim_mes = hoje.replace(day=ultimo_dia)
+    
+    dt_inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
+    dt_fim = timezone.make_aware(datetime.combine(fim_mes, time.max), tz)
+    return dt_inicio, dt_fim, inicio_mes, hoje
 
 # =========================
 # ADEGA ATUAL (FIXA)
@@ -195,21 +207,16 @@ def novo_produto(request):
 
 
 # =========================
-# RELATÓRIOS
+# RELATÓRIOS (CORRIGIDO PARA MENSAL)
 # =========================
 @login_required
 def relatorios(request):
     adega = get_adega_atual(request)
-
-    hoje = timezone.localdate()
-    inicio_mes = hoje.replace(day=1)
-
-    dt_inicio, _ = _range_dia(inicio_mes)
-    _, dt_fim = _range_dia(hoje)
+    dt_inicio, dt_fim, inicio_mes, hoje = _get_range_mes_atual()
 
     itens_qs = (
         Movimentacao.objects
-        .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
+        .filter(adega=adega, data__range=(dt_inicio, dt_fim))
         .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
         .order_by("-data")
@@ -353,21 +360,16 @@ def vendas_periodo(request):
 
 
 # =========================
-# BAIXAR RELATÓRIO CSV (MELHORADO + HORA CERTA)
+# BAIXAR RELATÓRIO CSV (MENSAL)
 # =========================
 @login_required
 def baixar_relatorio(request):
     adega = get_adega_atual(request)
-
-    hoje = timezone.localdate()
-    inicio_mes = hoje.replace(day=1)
-
-    dt_inicio, _ = _range_dia(inicio_mes)
-    _, dt_fim = _range_dia(hoje)
+    dt_inicio, dt_fim, inicio_mes, _ = _get_range_mes_atual()
 
     itens_qs = (
         Movimentacao.objects
-        .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
+        .filter(adega=adega, data__range=(dt_inicio, dt_fim))
         .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
         .order_by("data")
@@ -378,10 +380,7 @@ def baixar_relatorio(request):
         f'attachment; filename="relatorio_{inicio_mes.strftime("%Y_%m")}.csv"'
     )
 
-    # ✅ BOM para Excel abrir acentos corretamente
     response.write("\ufeff")
-
-    # ✅ separador ; (Excel pt-BR não bagunça)
     writer = csv.writer(response, delimiter=";")
     writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
 
@@ -389,7 +388,6 @@ def baixar_relatorio(request):
         preco = _money(_to_decimal(m.produto.preco_venda))
         qtd = int(m.quantidade)
         total_linha = _money(preco * _to_decimal(qtd))
-
         dt = timezone.localtime(m.data) if m.data else None
 
         writer.writerow([
@@ -405,22 +403,17 @@ def baixar_relatorio(request):
 
 
 # =========================
-# LIMPAR RELATÓRIO
+# LIMPAR RELATÓRIO (MENSAL)
 # =========================
 @login_required
 @require_POST
 def limpar_relatorio(request):
     adega = get_adega_atual(request)
-
-    hoje = timezone.localdate()
-    inicio_mes = hoje.replace(day=1)
-
-    dt_inicio, _ = _range_dia(inicio_mes)
-    _, dt_fim = _range_dia(hoje)
+    dt_inicio, dt_fim, _, _ = _get_range_mes_atual()
 
     apagados, _ = (
         Movimentacao.objects
-        .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
+        .filter(adega=adega, data__range=(dt_inicio, dt_fim))
         .exclude(tipo__iexact="ENTRADA")
         .delete()
     )
