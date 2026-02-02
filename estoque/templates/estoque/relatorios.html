@@ -1,35 +1,33 @@
 {% extends "estoque/base.html" %}
 
-{% block title %}Relatório do Mês - Sistema Adega{% endblock %}
+{% block title %}Relatório de {{ nome_mes }} - Sistema Adega{% endblock %}
 
 {% block content %}
 <div class="container">
 
-  <h2>📊 Relatório do Mês</h2>
+  <h2>📊 Relatório de {{ nome_mes }}</h2>
   <p class="text-muted">
     Período: <b>{{ inicio_mes|date:"d/m/Y" }}</b> até <b>{{ hoje|date:"d/m/Y" }}</b>
   </p>
 
-  <!-- ✅ AÇÕES -->
   <div class="acoes">
     <a href="{% url 'baixar_relatorio' %}" class="btn btn-download">
-      ⬇️ Baixar
+      ⬇️ Baixar CSV
     </a>
 
     <form method="post" action="{% url 'limpar_relatorio' %}" class="form-limpar">
       {% csrf_token %}
       <button type="submit" class="btn btn-danger"
         onclick="return confirm('Tem certeza que deseja LIMPAR as vendas do mês? Isso apaga as SAÍDAS do mês atual.')">
-        🧹 Limpar
+        扫 Limpar Relatório
       </button>
     </form>
   </div>
 
-  <!-- RESUMO -->
   <div class="cards">
     <div class="card resumo">
       <span>Total vendido</span>
-      <strong>R$ {{ resumo.total_vendido|floatformat:2 }}</strong>
+      <strong>R$ {{ resumo.total_vendido }}</strong>
     </div>
 
     <div class="card resumo">
@@ -43,9 +41,8 @@
     </div>
   </div>
 
-  <!-- TABELA -->
   <div class="card tabela">
-    <h3>Detalhamento das vendas do mês</h3>
+    <h3>Detalhamento das vendas</h3>
 
     <table>
       <thead>
@@ -64,14 +61,14 @@
           <td>{{ mov.data|date:"d/m/Y H:i" }}</td>
           <td>{{ mov.produto_nome }}</td>
           <td>{{ mov.quantidade }}</td>
-          <td>R$ {{ mov.preco_venda|floatformat:2 }}</td>
-          <td>R$ {{ mov.total_linha|floatformat:2 }}</td>
+          <td>R$ {{ mov.preco_venda }}</td>
+          <td>R$ {{ mov.total_linha }}</td>
           <td>{{ mov.tipo }}</td>
         </tr>
         {% empty %}
         <tr>
           <td colspan="6" class="vazio">
-            Nenhuma venda encontrada neste mês.
+            Nenhuma venda encontrada em {{ nome_mes }}.
           </td>
         </tr>
         {% endfor %}
@@ -82,8 +79,8 @@
 </div>
 
 <style>
-.container { max-width: 1100px; padding: 22px; border-radius: 14px; background: rgba(17, 24, 39, 0.88); }
-h2, h3 { color: #f9fafb; }
+.container { max-width: 1100px; padding: 22px; border-radius: 14px; background: rgba(17, 24, 39, 0.88); margin: 0 auto; }
+h2, h3 { color: #f9fafb; margin-top: 0; }
 .text-muted { color: #cbd5e1; margin-bottom: 16px; }
 
 .card {
@@ -101,47 +98,21 @@ h2, h3 { color: #f9fafb; }
   gap: 16px;
 }
 
-.resumo span { font-size: 13px; color: #cbd5e1; }
+.resumo span { font-size: 13px; color: #cbd5e1; display: block; }
 .resumo strong { font-size: 22px; color: #ffffff; }
 
-.tabela table { width: 100%; border-collapse: collapse; }
-.tabela th, .tabela td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.12); color: #f9fafb; }
-.tabela th { text-align: left; font-size: 13px; color: #cbd5e1; }
+.tabela table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.tabela th, .tabela td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.12); color: #f9fafb; }
+.tabela th { text-align: left; font-size: 13px; color: #cbd5e1; text-transform: uppercase; }
 
-.vazio { text-align: center; color: #cbd5e1; padding: 20px; }
+.vazio { text-align: center; color: #cbd5e1; padding: 40px; font-style: italic; }
 
-/* ✅ BOTÕES */
-.acoes {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 10px 0 18px;
-}
-
-.btn {
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-weight: 700;
-  text-decoration: none;
-  border: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-download {
-  background: #22c55e;
-  color: #052e16;
-}
-.btn-download:hover { background: #16a34a; }
-
-.btn-danger {
-  background: #ef4444;
-  color: #fff;
-}
-.btn-danger:hover { background: #dc2626; }
-
+.acoes { display: flex; gap: 10px; align-items: center; margin: 10px 0 18px; }
+.btn { padding: 10px 14px; border-radius: 10px; font-weight: 700; text-decoration: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+.btn-download { background: #22c55e; color: #052e16; }
+.btn-download:hover { background: #16a34a; transform: scale(1.02); }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger:hover { background: #dc2626; transform: scale(1.02); }
 .form-limpar { margin: 0; }
 </style>
 {% endblock %}

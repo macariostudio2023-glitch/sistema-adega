@@ -10,7 +10,8 @@
   <p style="text-align:center; margin-top:6px;">
     APONTE O LEITOR PARA O CÓDIGO DE BARRAS E CONFIRME A ENTRADA
   </p>
-s
+
+  {% if messages %}
     <ul style="list-style:none; padding:0; margin:12px 0;">
       {% for message in messages %}
         <li style="
@@ -27,7 +28,6 @@ s
     </ul>
   {% endif %}
 
-  <!-- 🔹 FORMULÁRIO DE ENTRADA -->
   <form method="post" id="entradaForm">
     {% csrf_token %}
 
@@ -44,7 +44,6 @@ s
     </div>
   </form>
 
-  <!-- 🔎 CONSULTA DE ESTOQUE -->
   <hr style="margin:26px 0; border-color:#1f2937; opacity:.6;">
 
   <h3 id="titulo-consulta" style="text-align:center; margin:0 0 10px 0;">
@@ -97,7 +96,6 @@ s
 
   campoBusca.addEventListener("input", function () {
     const termo = this.value.trim();
-
     clearTimeout(timer);
     timer = setTimeout(() => buscarEstoque(termo), 250);
   });
@@ -113,14 +111,7 @@ s
       .then(dados => {
         if (!dados || dados.length === 0) {
           resultado.innerHTML = `
-            <div style="
-              margin-top:10px;
-              padding:12px;
-              border-radius:12px;
-              text-align:center;
-              font-weight:bold;
-              background:rgba(239,68,68,.15);
-            ">
+            <div style="margin-top:10px; padding:12px; border-radius:12px; text-align:center; font-weight:bold; background:rgba(239,68,68,.15);">
               Nenhum produto encontrado.
             </div>
           `;
@@ -136,27 +127,14 @@ s
           html += `
             <li
               onclick="selecionarProduto('${codigo}')"
-              style="
-                cursor:pointer;
-                padding:12px;
-                border-radius:12px;
-                background:rgba(255,255,255,.05);
-                border:1px solid rgba(255,255,255,.08);
-                text-align:center;
-              "
+              style="cursor:pointer; padding:12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center;"
             >
               <div style="font-weight:bold; font-size:16px;">${p.nome}</div>
-
               <div style="opacity:.9; margin-top:6px;">
                 Código: <b>${codigo || "-"}</b> • Preço: <b>R$ ${p.preco}</b>
               </div>
-
               <div style="margin-top:8px; font-weight:bold; color:${estoqueBaixo ? '#f87171' : '#a7f3d0'};">
                 Estoque: ${p.estoque} ${estoqueBaixo ? "(BAIXO)" : ""}
-              </div>
-
-              <div style="margin-top:8px; font-size:12px; opacity:.85;">
-                Clique para preencher o código automaticamente
               </div>
             </li>
           `;
@@ -166,32 +144,16 @@ s
         resultado.innerHTML = html;
       })
       .catch(() => {
-        resultado.innerHTML = `
-          <div style="
-            margin-top:10px;
-            padding:12px;
-            border-radius:12px;
-            text-align:center;
-            font-weight:bold;
-            background:rgba(239,68,68,.15);
-          ">
-            Erro ao consultar estoque.
-          </div>
-        `;
+        resultado.innerHTML = `<div style="padding:12px; text-align:center; background:rgba(239,68,68,.15);">Erro ao consultar.</div>`;
       });
   }
 
-  // 🖱️ Clicar → preenche o código e volta o foco
   function selecionarProduto(codigo){
     if(!codigo || !campoCodigo) return;
     campoCodigo.value = codigo;
     campoCodigo.focus();
   }
 
-  // deixa global pra funcionar no onclick do HTML
   window.selecionarProduto = selecionarProduto;
 </script>
 {% endblock %}
-
-
-
