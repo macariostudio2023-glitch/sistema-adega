@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Acesso - Sistema Adega</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #2c0000; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: white; color: #333; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 300px; text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #800000; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #a00000; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>🍷 Adega Gestão</h2>
+        <p>Acesse sua conta</p>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+</body>
+</html>

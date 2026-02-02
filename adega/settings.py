@@ -13,7 +13,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-%r^$=wne72==ofh@j(0nb(mzdutu(*cy52cvz1l^6!bh%-u5!7")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# No Render: Configure a variável de ambiente DEBUG como 1 se precisar de ver detalhes do erro
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
 # No Render: Configurado para aceitar o domínio do Render ou localhost
@@ -32,18 +31,18 @@ INSTALLED_APPS = [
     "estoque.apps.EstoqueConfig",
 ]
 
-# ORDEM CORRETA DOS MIDDLEWARES (Corrigido para evitar Erro 500)
+# ORDEM CORRETA DOS MIDDLEWARES
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware", # Serve arquivos estáticos
     "django.contrib.sessions.middleware.SessionMiddleware", # Inicia sessão
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware", # Autenticação (obrigatório antes do Gate)
+    "django.contrib.auth.middleware.AuthenticationMiddleware", # Autenticação
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     
-    # O teu middleware customizado deve vir DEPOIS da autenticação e sessão
+    # O teu middleware customizado
     "estoque.middleware.AdminGateMiddleware", 
 ]
 
@@ -105,14 +104,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # =========================
 # 🔐 ADMIN GATE PASSWORD
 # =========================
-# Certifica-te de que esta variável está no painel "Environment" do Render
 ADMIN_GATE_PASSWORD = os.environ.get("ADMIN_GATE_PASSWORD", "")
 
 # =========================
-# 🛡️ CONFIGURAÇÕES DE ACESSO (Obrigatório para o login funcionar)
+# 🛡️ CONFIGURAÇÕES DE ACESSO
 # =========================
-# Quando alguém tenta acessar sem estar logado, é enviado para aqui:
-LOGIN_URL = '/admin/login/'
+
+# Ajustado para usar a sua tela customizada /login/ configurada no urls.py
+LOGIN_URL = '/login/'
 
 # Após o login com sucesso, o usuário cai nesta página:
 LOGIN_REDIRECT_URL = '/entrada-codigo/'
+
+# Após sair do sistema, volta para a tela de login
+LOGOUT_REDIRECT_URL = '/login/'
