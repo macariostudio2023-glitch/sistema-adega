@@ -383,7 +383,7 @@ def baixar_relatorio(request):
 
     # ✅ separador ; (Excel pt-BR não bagunça)
     writer = csv.writer(response, delimiter=";")
-    writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
+    writer.writerow(["Data", "Horário", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
 
     for m in itens_qs:
         preco = _money(_to_decimal(m.produto.preco_venda))
