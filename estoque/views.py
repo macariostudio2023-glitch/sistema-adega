@@ -42,7 +42,7 @@ def _range_dia(uma_data):
     return inicio, fim
 
 def _get_range_mes_atual():
-    """Helper para pegar o primeiro e último momento do mês atual"""
+    """Retorna datas estruturadas para o mês atual"""
     tz = timezone.get_current_timezone()
     hoje = timezone.localdate()
     inicio_mes = hoje.replace(day=1)
@@ -51,7 +51,16 @@ def _get_range_mes_atual():
     
     dt_inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
     dt_fim = timezone.make_aware(datetime.combine(fim_mes, time.max), tz)
-    return dt_inicio, dt_fim, inicio_mes, hoje
+    
+    # Nomes dos meses em português
+    meses_pt = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    nome_mes = f"{meses_pt[hoje.month]} / {hoje.year}"
+    
+    return dt_inicio, dt_fim, inicio_mes, fim_mes, nome_mes
 
 # =========================
 # ADEGA ATUAL (FIXA)
@@ -63,13 +72,8 @@ def get_adega_atual(request):
     )
     return adega
 
-
-# =========================
-# HOME
-# =========================
 def home(request):
     return redirect("entrada_codigo")
-
 
 # =========================
 # ENTRADA POR CÓDIGO
@@ -102,15 +106,10 @@ def entrada_codigo_barras(request):
         )
 
         valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_custo))
-        messages.success(
-            request,
-            f"✅ Entrada registrada!\n{produto.nome}\nR$ {valor_total}"
-        )
-
+        messages.success(request, f"✅ Entrada registrada!\n{produto.nome}\nR$ {valor_total}")
         form = EntradaCodigoBarrasForm()
 
     return render(request, "estoque/entrada_codigo.html", {"form": form})
-
 
 # =========================
 # SAÍDA POR CÓDIGO
@@ -135,12 +134,8 @@ def saida_codigo_barras(request):
 
         with transaction.atomic():
             produto.refresh_from_db()
-
             if produto.estoque_atual < quantidade:
-                messages.error(
-                    request,
-                    f"Estoque insuficiente. Atual: {produto.estoque_atual}"
-                )
+                messages.error(request, f"Estoque insuficiente. Atual: {produto.estoque_atual}")
                 return render(request, "estoque/saida_codigo.html", {"form": form})
 
             Movimentacao.objects.create(
@@ -153,15 +148,10 @@ def saida_codigo_barras(request):
             )
 
         valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_venda))
-        messages.success(
-            request,
-            f"✅ Venda registrada!\n{produto.nome}\nR$ {valor_total}"
-        )
-
+        messages.success(request, f"✅ Venda registrada!\n{produto.nome}\nR$ {valor_total}")
         form = SaidaCodigoBarrasForm()
 
     return render(request, "estoque/saida_codigo.html", {"form": form})
-
 
 # =========================
 # NOVO PRODUTO
@@ -169,7 +159,6 @@ def saida_codigo_barras(request):
 @login_required
 def novo_produto(request):
     adega = get_adega_atual(request)
-
     codigo = request.GET.get("codigo", "").strip()
     voltar = request.GET.get("voltar", "/entrada-codigo/")
 
@@ -193,26 +182,20 @@ def novo_produto(request):
                 preco_venda=form.cleaned_data["preco_venda"],
                 estoque_atual=form.cleaned_data["estoque_inicial"],
             )
-
             messages.success(request, f"✅ Produto cadastrado: {produto.nome}")
-            return render(
-                request,
-                "estoque/produto_cadastrado.html",
-                {"produto": produto, "voltar": voltar}
-            )
+            return render(request, "estoque/produto_cadastrado.html", {"produto": produto, "voltar": voltar})
     else:
         form = NovoProdutoPorCodigoForm(initial={"codigo_barras": codigo})
 
     return render(request, "estoque/novo_produto.html", {"form": form})
 
-
 # =========================
-# RELATÓRIOS (CORRIGIDO PARA MENSAL)
+# RELATÓRIOS (VERSÃO FINAL ELEGANTE)
 # =========================
 @login_required
 def relatorios(request):
     adega = get_adega_atual(request)
-    dt_inicio, dt_fim, inicio_mes, hoje = _get_range_mes_atual()
+    dt_inicio, dt_fim, inicio_mes, fim_mes, nome_mes = _get_range_mes_atual()
 
     itens_qs = (
         Movimentacao.objects
@@ -253,9 +236,9 @@ def relatorios(request):
         "itens": itens,
         "resumo": resumo,
         "inicio_mes": inicio_mes,
-        "hoje": hoje,
+        "hoje": fim_mes,  # Agora passa o último dia do mês para o HTML
+        "nome_mes": nome_mes, # Nome do mês em português
     })
-
 
 # =========================
 # ESTOQUE BAIXO
@@ -266,17 +249,8 @@ def estoque_baixo(request):
     form = FiltroEstoqueBaixoForm(request.GET or None)
     limite = form.cleaned_data["limite"] if form.is_valid() else 5
 
-    produtos = Produto.objects.filter(
-        adega=adega,
-        estoque_atual__lte=limite
-    ).order_by("estoque_atual", "nome")
-
-    return render(request, "estoque/estoque_baixo.html", {
-        "form": form,
-        "limite": limite,
-        "produtos": produtos,
-    })
-
+    produtos = Produto.objects.filter(adega=adega, estoque_atual__lte=limite).order_by("estoque_atual", "nome")
+    return render(request, "estoque/estoque_baixo.html", {"form": form, "limite": limite, "produtos": produtos})
 
 # =========================
 # CONSULTA DE ESTOQUE
@@ -285,29 +259,9 @@ def estoque_baixo(request):
 def consultar_estoque(request):
     adega = get_adega_atual(request)
     termo = request.GET.get("q", "").strip()
-
-    produtos = (
-        Produto.objects
-        .filter(adega=adega)
-        .filter(
-            Q(nome__icontains=termo) |
-            Q(codigo_barras__icontains=termo)
-        )
-        .order_by("nome")[:10]
-    )
-
-    dados = [
-        {
-            "nome": p.nome,
-            "codigo": p.codigo_barras,
-            "estoque": p.estoque_atual,
-            "preco": str(_money(_to_decimal(p.preco_venda))),
-        }
-        for p in produtos
-    ]
-
+    produtos = Produto.objects.filter(adega=adega).filter(Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)).order_by("nome")[:10]
+    dados = [{"nome": p.nome, "codigo": p.codigo_barras, "estoque": p.estoque_atual, "preco": str(_money(_to_decimal(p.preco_venda)))} for p in produtos]
     return JsonResponse(dados, safe=False)
-
 
 # =========================
 # VENDAS HOJE
@@ -315,126 +269,67 @@ def consultar_estoque(request):
 @login_required
 def vendas_hoje(request):
     adega = get_adega_atual(request)
-
     hoje = timezone.localdate()
     inicio, fim = _range_dia(hoje)
-
-    itens_qs = (
-        Movimentacao.objects
-        .filter(adega=adega, data__gte=inicio, data__lte=fim)
-        .exclude(tipo__iexact="ENTRADA")
-        .select_related("produto")
-        .order_by("-data")
-    )
-
+    itens_qs = Movimentacao.objects.filter(adega=adega, data__gte=inicio, data__lte=fim).exclude(tipo__iexact="ENTRADA").select_related("produto").order_by("-data")
+    
     itens = []
     total = Decimal("0.00")
-
     for m in itens_qs:
         preco = _money(_to_decimal(m.produto.preco_venda))
         qtd = int(m.quantidade)
         total_linha = _money(preco * _to_decimal(qtd))
-
-        itens.append({
-            "data": m.data,
-            "produto_nome": m.produto.nome,
-            "quantidade": qtd,
-            "preco_venda": preco,
-            "total_linha": total_linha,
-            "tipo": m.tipo,
-        })
-
+        itens.append({"data": m.data, "produto_nome": m.produto.nome, "quantidade": qtd, "preco_venda": preco, "total_linha": total_linha, "tipo": m.tipo})
         total += total_linha
 
-    return render(request, "estoque/vendas_hoje.html", {
-        "hoje": hoje,
-        "itens": itens,
-        "total": _money(total),
-        "total_vendas": itens_qs.count(),
-    })
-
+    return render(request, "estoque/vendas_hoje.html", {"hoje": hoje, "itens": itens, "total": _money(total), "total_vendas": itens_qs.count()})
 
 @login_required
 def vendas_periodo(request):
     return relatorios(request)
 
-
 # =========================
-# BAIXAR RELATÓRIO CSV (MENSAL)
+# BAIXAR RELATÓRIO CSV
 # =========================
 @login_required
 def baixar_relatorio(request):
     adega = get_adega_atual(request)
-    dt_inicio, dt_fim, inicio_mes, _ = _get_range_mes_atual()
-
-    itens_qs = (
-        Movimentacao.objects
-        .filter(adega=adega, data__range=(dt_inicio, dt_fim))
-        .exclude(tipo__iexact="ENTRADA")
-        .select_related("produto")
-        .order_by("data")
-    )
+    dt_inicio, dt_fim, inicio_mes, _, _ = _get_range_mes_atual()
+    itens_qs = Movimentacao.objects.filter(adega=adega, data__range=(dt_inicio, dt_fim)).exclude(tipo__iexact="ENTRADA").select_related("produto").order_by("data")
 
     response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = (
-        f'attachment; filename="relatorio_{inicio_mes.strftime("%Y_%m")}.csv"'
-    )
-
+    response["Content-Disposition"] = f'attachment; filename="relatorio_{inicio_mes.strftime("%Y_%m")}.csv"'
     response.write("\ufeff")
     writer = csv.writer(response, delimiter=";")
     writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
 
     for m in itens_qs:
-        preco = _money(_to_decimal(m.produto.preco_venda))
-        qtd = int(m.quantidade)
-        total_linha = _money(preco * _to_decimal(qtd))
         dt = timezone.localtime(m.data) if m.data else None
-
-        writer.writerow([
-            dt.strftime("%d/%m/%Y %H:%M") if dt else "",
-            m.produto.nome,
-            qtd,
-            f"{preco:.2f}".replace(".", ","),
-            f"{total_linha:.2f}".replace(".", ","),
-            m.tipo,
-        ])
-
+        preco = _money(_to_decimal(m.produto.preco_venda))
+        total_linha = _money(preco * _to_decimal(m.quantidade))
+        writer.writerow([dt.strftime("%d/%m/%Y %H:%M") if dt else "", m.produto.nome, int(m.quantidade), f"{preco:.2f}".replace(".", ","), f"{total_linha:.2f}".replace(".", ","), m.tipo])
     return response
 
-
 # =========================
-# LIMPAR RELATÓRIO (MENSAL)
+# LIMPAR RELATÓRIO
 # =========================
 @login_required
 @require_POST
 def limpar_relatorio(request):
     adega = get_adega_atual(request)
-    dt_inicio, dt_fim, _, _ = _get_range_mes_atual()
-
-    apagados, _ = (
-        Movimentacao.objects
-        .filter(adega=adega, data__range=(dt_inicio, dt_fim))
-        .exclude(tipo__iexact="ENTRADA")
-        .delete()
-    )
-
-    messages.success(
-        request,
-        f"✅ Relatório limpo. Registros removidos: {apagados}"
-    )
+    dt_inicio, dt_fim, _, _, _ = _get_range_mes_atual()
+    apagados, _ = Movimentacao.objects.filter(adega=adega, data__range=(dt_inicio, dt_fim)).exclude(tipo__iexact="ENTRADA").delete()
+    messages.success(request, f"✅ Relatório limpo. Registros removidos: {apagados}")
     return redirect("relatorios")
 
-
 # =========================
-# 🔐 GATE DO ADMIN (MANTIDO)
+# GATE ADMIN
 # =========================
 @csrf_exempt
 @require_POST
 def admin_gate_check(request):
     senha = request.POST.get("senha", "").strip()
-
     if settings.ADMIN_GATE_PASSWORD and senha == settings.ADMIN_GATE_PASSWORD:
         request.session["admin_gate_ok"] = True
         return JsonResponse({"ok": True}, status=200)
-
     return JsonResponse({"ok": False}, status=401)
