@@ -353,7 +353,7 @@ def vendas_periodo(request):
 
 
 # =========================
-# BAIXAR RELATÓRIO CSV
+# BAIXAR RELATÓRIO CSV (MELHORADO)
 # =========================
 @login_required
 def baixar_relatorio(request):
@@ -370,7 +370,7 @@ def baixar_relatorio(request):
         .filter(adega=adega, data__gte=dt_inicio, data__lte=dt_fim)
         .exclude(tipo__iexact="ENTRADA")
         .select_related("produto")
-        .order_by("-data")
+        .order_by("data")  # ✅ mais organizado no CSV
     )
 
     response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -378,7 +378,11 @@ def baixar_relatorio(request):
         f'attachment; filename="relatorio_{inicio_mes.strftime("%Y_%m")}.csv"'
     )
 
-    writer = csv.writer(response)
+    # ✅ BOM para Excel abrir acentos corretamente
+    response.write("\ufeff")
+
+    # ✅ separador ; (Excel pt-BR não bagunça)
+    writer = csv.writer(response, delimiter=";")
     writer.writerow(["Data", "Produto", "Quantidade", "Preço", "Total", "Tipo"])
 
     for m in itens_qs:
@@ -390,8 +394,8 @@ def baixar_relatorio(request):
             m.data.strftime("%d/%m/%Y %H:%M") if m.data else "",
             m.produto.nome,
             qtd,
-            f"{preco}",
-            f"{total_linha}",
+            f"{preco:.2f}".replace(".", ","),
+            f"{total_linha:.2f}".replace(".", ","),
             m.tipo,
         ])
 
@@ -439,5 +443,3 @@ def admin_gate_check(request):
         return JsonResponse({"ok": True}, status=200)
 
     return JsonResponse({"ok": False}, status=401)
-
-
