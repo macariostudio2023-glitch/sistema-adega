@@ -21,16 +21,7 @@
 
   <hr style="margin:20px 0;">
 
-  <div
-    style="
-      background:rgba(2,6,23,0.55);
-      border:1px solid #1f2937;
-      border-radius:12px;
-      padding:14px;
-      text-align:left;
-      margin-bottom:16px;
-    "
-  >
+  <div style="background:rgba(2,6,23,0.55); border:1px solid #1f2937; border-radius:12px; padding:14px; text-align:left; margin-bottom:16px;">
     <div style="font-weight:800; margin-bottom:6px;">Prévia da venda</div>
     <div>Produto: <span id="prev-nome" style="font-weight:700;">—</span></div>
     <div>Preço unitário: <span id="prev-unit" style="font-weight:700;">R$ 0,00</span></div>
@@ -43,14 +34,22 @@
   <form method="post" id="form-venda">
     {% csrf_token %}
 
-    <div style="display: none;">
-        {{ form.codigo_barras }}
-    </div>
+    <input type="hidden" name="codigo_barras" id="id_codigo_barras">
 
     <label>Quantidade</label>
-    <input type="number" name="quantidade" id="id_quantidade" class="form-control" required min="1" placeholder="0">
+    <input 
+        type="number" 
+        name="quantidade" 
+        id="id_quantidade" 
+        class="form-control" 
+        required 
+        min="1" 
+        placeholder="Digite a quantidade..."
+        value="" 
+        style="font-size: 20px; text-align: center;"
+    >
 
-    <button type="submit" id="btn-confirmar" style="margin-top: 15px;">
+    <button type="submit" id="btn-confirmar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold;">
       ✅ Confirmar Venda
     </button>
   </form>
@@ -76,43 +75,31 @@ function dinheiroBR(valor){
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function limparPrevia(){
-  prevNome.innerText = "—";
-  prevUnit.innerText = "R$ 0,00";
-  prevTotal.innerText = "R$ 0,00";
-  prevErro.innerText = "";
-  precoUnitarioAtual = 0;
-  campoCodigoHidden.value = "";
-  campoQtd.value = "";
-}
-
 function recalcularTotal() {
   const qtd = parseInt(campoQtd.value) || 0;
   const total = precoUnitarioAtual * qtd;
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA DEFINITIVA: Impede o Enter de enviar o formulário em qualquer lugar da página
-window.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && e.target.nodeName !== 'TEXTAREA') {
-    // Se o foco estiver na Quantidade, o Enter até poderia salvar, 
-    // mas para garantir que você veja o preço, vamos bloquear tudo.
-    if (e.target.id !== 'btn-confirmar') {
-        e.preventDefault();
-        return false;
-    }
+// 🛑 TRAVA 1: Impede o Enter de enviar o formulário
+formVenda.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault(); // Bloqueia o envio automático
+    return false;
   }
-}, True);
+});
+
+// 🛑 TRAVA 2: Impede o Enter no campo de busca (leitor)
+inputBusca.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+  }
+});
 
 let timerBusca = null;
 inputBusca.addEventListener("input", function(){
   const termo = inputBusca.value.trim();
-
-  if(termo.length < 2){
-    lista.innerHTML = "";
-    if(termo.length === 0) limparPrevia();
-    return;
-  }
+  if(termo.length < 2) return;
 
   clearTimeout(timerBusca);
   timerBusca = setTimeout(() => {
@@ -120,21 +107,17 @@ inputBusca.addEventListener("input", function(){
       .then(res => res.json())
       .then(dados => {
         lista.innerHTML = "";
-        
-        if(dados.length === 1 && (dados[0].codigo === termo)) {
+        // Se o leitor achar o código exato
+        if(dados.length === 1 && dados[0].codigo === termo) {
             selecionarProduto(dados[0]);
+            inputBusca.value = ""; // Limpa a busca para o próximo
             return;
         }
-
-        if(dados.length === 0){
-          prevErro.innerText = "Produto não encontrado.";
-          return;
-        }
-
+        // ... (resto da lógica de lista)
         dados.forEach(p => {
           const li = document.createElement("li");
-          li.innerHTML = `<strong>${p.nome}</strong><br><small>Qtd: ${p.estoque} | R$ ${p.preco_venda}</small>`;
-          li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
+          li.innerHTML = `<strong>${p.nome}</strong> - R$ ${p.preco_venda}`;
+          li.style = "padding:10px; border:1px solid #374151; cursor:pointer; background: #111827; margin-bottom:5px; border-radius:8px;";
           li.onclick = () => selecionarProduto(p);
           lista.appendChild(li);
         });
@@ -143,20 +126,18 @@ inputBusca.addEventListener("input", function(){
 });
 
 function selecionarProduto(p) {
-    precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
+    precoUnitarioAtual = parseFloat(String(p.preco_venda).replace(",", ".")) || 0;
     prevNome.innerText = p.nome;
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
-    inputBusca.value = p.nome; // Preenche o nome para o usuário saber o que bipou
-    lista.innerHTML = "";
-    prevErro.innerText = "";
     
+    // ✅ LIMPEZA TOTAL: Garante que o campo nasça vazio e focado
     campoQtd.value = ""; 
     recalcularTotal();
     
     setTimeout(() => {
         campoQtd.focus();
-    }, 150);
+    }, 200);
 }
 
 campoQtd.addEventListener("input", recalcularTotal);
