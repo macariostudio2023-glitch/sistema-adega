@@ -44,12 +44,12 @@
         class="form-control" 
         required 
         min="1" 
-        placeholder="0"
+        placeholder="Digite a quantidade..."
         value="" 
-        style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white; border: 1px solid #334155;"
+        style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white;"
     >
 
-    <button type="button" id="btn-finalizar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: 800; background-color: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer;">
+    <button type="button" id="btn-finalizar-venda" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: 800; background-color: #22c55e; color: white; border-radius: 8px;">
       ✅ CONFIRMAR VENDA
     </button>
   </form>
@@ -62,7 +62,7 @@ const lista = document.getElementById("resultado-busca");
 const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 const formVenda = document.getElementById("form-venda");
-const btnFinalizar = document.getElementById("btn-finalizar");
+const btnFinalizar = document.getElementById("btn-finalizar-venda");
 
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
@@ -82,27 +82,26 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA TOTAL: Impede que o formulário seja enviado por qualquer tecla (Enter do leitor)
+// 🛑 TRAVA DE OURO: Bloqueia qualquer tentativa de envio automático pelo Enter
 formVenda.onsubmit = (e) => { e.preventDefault(); return false; };
 
-// ✅ ENVIO MANUAL: Só envia quando você clicar no botão verde
+// ✅ ENVIO MANUAL: A venda só é processada quando você CLICA no botão verde
 btnFinalizar.addEventListener("click", function() {
   const qtd = parseInt(campoQtd.value) || 0;
   const codigo = campoCodigoHidden.value;
 
   if (!codigo) {
-    alert("Macario, bipe ou selecione um produto primeiro!");
-    inputBusca.focus();
+    alert("Macario, bipe o produto primeiro!");
     return;
   }
 
   if (qtd <= 0) {
-    alert("Macario, a quantidade deve ser pelo menos 1!");
+    alert("Macario, informe a quantidade!");
     campoQtd.focus();
     return;
   }
 
-  // Se tudo estiver certo, envia o formulário
+  // Só aqui o formulário é enviado de verdade
   formVenda.submit();
 });
 
@@ -118,16 +117,10 @@ inputBusca.addEventListener("input", function(){
       .then(dados => {
         lista.innerHTML = "";
         
-        // Se for um BIP certeiro
         if(dados.length === 1 && (dados[0].codigo === termo)) {
             selecionarProduto(dados[0]);
             inputBusca.value = ""; 
             return;
-        }
-
-        if(dados.length === 0){
-          prevErro.innerText = "Produto não encontrado.";
-          return;
         }
 
         dados.forEach(p => {
@@ -151,10 +144,11 @@ function selecionarProduto(p) {
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
     
-    // ✅ Limpa o campo e foca
+    // ✅ Limpa o campo de quantidade para não ter o "1"
     campoQtd.value = ""; 
     recalcularTotal();
     
+    // Foca na quantidade para o vendedor digitar
     setTimeout(() => {
         campoQtd.focus();
     }, 200);
@@ -162,7 +156,7 @@ function selecionarProduto(p) {
 
 campoQtd.addEventListener("input", recalcularTotal);
 
-// Bloqueia o Enter no campo de busca para o leitor não dar "submit"
+// Impede que o Enter no campo de busca envie o form
 inputBusca.addEventListener("keydown", function(e) {
     if (e.key === "Enter") e.preventDefault();
 });
