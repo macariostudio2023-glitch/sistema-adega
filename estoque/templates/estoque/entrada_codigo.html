@@ -7,21 +7,14 @@
 <div class="centered-card">
 
   <h2 style="text-align:center;">📦 Entrada por Código de Barras</h2>
-  <p style="text-align:center; margin-top:6px;">
-    APONTE O LEITOR PARA O CÓDIGO DE BARRAS E CONFIRME A ENTRADA
+  <p style="text-align:center; margin-top:6px; font-size: 0.9em; opacity: 0.8;">
+    APONTE O LEITOR E CONFIRME A ENTRADA
   </p>
 
   {% if messages %}
     <ul style="list-style:none; padding:0; margin:12px 0;">
       {% for message in messages %}
-        <li style="
-          margin-bottom:8px;
-          padding:10px;
-          border-radius:10px;
-          font-weight:bold;
-          text-align:center;
-          background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %};
-        ">
+        <li style="margin-bottom:8px; padding:10px; border-radius:10px; font-weight:bold; text-align:center; background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %};">
           {{ message }}
         </li>
       {% endfor %}
@@ -32,29 +25,37 @@
     {% csrf_token %}
 
     <label style="text-align:left;">Código de barras</label>
-    {{ form.codigo_barras }}
+    <div style="display: flex; gap: 5px;">
+        <input type="text" name="codigo_barras" id="id_codigo_barras" 
+               inputmode="none" required autofocus 
+               style="flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+        
+        <button type="button" id="btn-consulta" style="width: 50px; background: #4b5563; padding: 0;">🔎</button>
+    </div>
 
-    <label style="text-align:left;">Quantidade</label>
+    <label style="text-align:left; margin-top: 15px; display: block;">Quantidade</label>
     {{ form.quantidade }}
 
-    <button type="submit">Confirmar Entrada</button>
+    <button type="submit" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #2563eb;">
+        Confirmar Entrada
+    </button>
 
-    <div class="hint" style="text-align:center;">
-      Dica: bipou o produto → ENTER confirma | F2 abre consulta
+    <div class="hint" style="text-align:center; margin-top: 15px;">
+      Bipou → ENTER confirma | Toque na 🔎 para buscar
     </div>
   </form>
 
   <hr style="margin:26px 0; border-color:#1f2937; opacity:.6;">
 
   <h3 id="titulo-consulta" style="text-align:center; margin:0 0 10px 0;">
-    🔎 Consultar produto no estoque
+    🔎 Consultar no estoque
   </h3>
 
   <input
     type="text"
     id="busca-produto"
-    placeholder="Digite nome ou código de barras (F2)"
-    style="margin-bottom:10px; text-align:center;"
+    placeholder="Digite nome ou código..."
+    style="margin-bottom:10px; text-align:center; width: 100%; padding: 12px;"
   >
 
   <div id="resultado-estoque"></div>
@@ -62,27 +63,42 @@
 </div>
 
 <script>
-  const campoCodigo = document.querySelector('input[name="codigo_barras"]');
+  const campoCodigo = document.getElementById("id_codigo_barras");
   const campoBusca = document.getElementById("busca-produto");
   const form = document.getElementById("entradaForm");
   const resultado = document.getElementById("resultado-estoque");
+  const btnConsulta = document.getElementById("btn-consulta");
 
-  // ✅ FOCO no código ao abrir
+  // ✅ FOCO AUTOMÁTICO E TRAVA TECLADO
   window.onload = function () {
-    if (campoCodigo) campoCodigo.focus();
+    if (campoCodigo) {
+        campoCodigo.focus();
+        campoCodigo.inputMode = "none"; // Garante que o Android não abra o teclado
+    }
   };
 
-  // ✅ ENTER confirma direto (leitor)
+  // ✅ CLICK NA LUPA (Substitui F2 no Tablet)
+  btnConsulta.addEventListener("click", function() {
+      campoBusca.focus();
+      campoBusca.scrollIntoView({behavior: "smooth"});
+  });
+
+  // ✅ ENTER DO LEITOR
   if (campoCodigo) {
     campoCodigo.addEventListener("keydown", function(e){
       if (e.key === "Enter") {
-        e.preventDefault();
+        // Se o código estiver vazio, não deixa enviar
+        if(this.value.trim() === "") {
+            e.preventDefault();
+            return;
+        }
+        // Se quiser que o leitor envie o form direto:
         form.submit();
       }
     });
   }
 
-  // ✅ F2 foca a consulta
+  // ✅ F2 CONTINUA FUNCIONANDO (Caso usem teclado físico)
   document.addEventListener("keydown", function(e){
     if (e.key === "F2") {
       e.preventDefault();
@@ -91,9 +107,8 @@
     }
   });
 
-  // ✅ Debounce para não fazer fetch a cada tecla
+  // ✅ BUSCA AJAX (Debounce)
   let timer = null;
-
   campoBusca.addEventListener("input", function () {
     const termo = this.value.trim();
     clearTimeout(timer);
@@ -110,41 +125,22 @@
       .then(res => res.json())
       .then(dados => {
         if (!dados || dados.length === 0) {
-          resultado.innerHTML = `
-            <div style="margin-top:10px; padding:12px; border-radius:12px; text-align:center; font-weight:bold; background:rgba(239,68,68,.15);">
-              Nenhum produto encontrado.
-            </div>
-          `;
+          resultado.innerHTML = `<div style="padding:12px; border-radius:12px; text-align:center; background:rgba(239,68,68,.15);">Não encontrado.</div>`;
           return;
         }
 
         let html = "<ul style='list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;'>";
-
         dados.forEach(p => {
           const estoqueBaixo = Number(p.estoque) <= 5;
-          const codigo = p.codigo || "";
-
           html += `
-            <li
-              onclick="selecionarProduto('${codigo}')"
-              style="cursor:pointer; padding:12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center;"
-            >
-              <div style="font-weight:bold; font-size:16px;">${p.nome}</div>
-              <div style="opacity:.9; margin-top:6px;">
-                Código: <b>${codigo || "-"}</b> • Preço: <b>R$ ${p.preco}</b>
-              </div>
-              <div style="margin-top:8px; font-weight:bold; color:${estoqueBaixo ? '#f87171' : '#a7f3d0'};">
-                Estoque: ${p.estoque} ${estoqueBaixo ? "(BAIXO)" : ""}
-              </div>
-            </li>
-          `;
+            <li onclick="selecionarProduto('${p.codigo}')" style="cursor:pointer; padding:12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center;">
+              <div style="font-weight:bold;">${p.nome}</div>
+              <div style="font-size:0.9em; opacity:.8;">Cod: ${p.codigo || "-"} | R$ ${p.preco}</div>
+              <div style="font-weight:bold; color:${estoqueBaixo ? '#f87171' : '#a7f3d0'};">Estoque: ${p.estoque}</div>
+            </li>`;
         });
-
         html += "</ul>";
         resultado.innerHTML = html;
-      })
-      .catch(() => {
-        resultado.innerHTML = `<div style="padding:12px; text-align:center; background:rgba(239,68,68,.15);">Erro ao consultar.</div>`;
       });
   }
 
@@ -152,8 +148,7 @@
     if(!codigo || !campoCodigo) return;
     campoCodigo.value = codigo;
     campoCodigo.focus();
+    window.scrollTo({top: 0, behavior: 'smooth'});
   }
-
-  window.selecionarProduto = selecionarProduto;
 </script>
 {% endblock %}
