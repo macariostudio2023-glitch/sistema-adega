@@ -77,26 +77,22 @@ def home(request):
     return redirect("entrada_codigo")
 
 # =========================
-# ENTRADA POR CÓDIGO
+# ENTRADA POR CÓDIGO (COM PADRÃO 1)
 # =========================
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
-    form = EntradaCodigoBarrasForm()
+    form = EntradaCodigoBarrasForm(request.POST or None)
 
     if request.method == "POST":
         codigo = request.POST.get("codigo_barras", "").strip()
-        qtd_raw = request.POST.get("quantidade", "").strip()
+        # Volta a aceitar "1" como padrão se vier vazio
+        qtd_str = request.POST.get("quantidade", "1").strip() or "1"
         
-        if not qtd_raw:
-            messages.error(request, "Por favor, digite a quantidade para a entrada.")
-            return render(request, "estoque/entrada_codigo.html", {"form": form})
-
         try:
-            quantidade = int(qtd_raw)
-            if quantidade <= 0: raise ValueError
+            quantidade = int(qtd_str)
         except ValueError:
-            messages.error(request, "Quantidade inválida. Use números inteiros (1, 2, 5...).")
+            messages.error(request, "Quantidade inválida.")
             return render(request, "estoque/entrada_codigo.html", {"form": form})
 
         if not codigo:
@@ -118,7 +114,7 @@ def entrada_codigo_barras(request):
     return render(request, "estoque/entrada_codigo.html", {"form": form})
 
 # =========================
-# SAÍDA POR CÓDIGO (Venda) - VERSÃO BLINDADA
+# SAÍDA POR CÓDIGO (COM PADRÃO 1)
 # =========================
 @login_required
 def saida_codigo_barras(request):
@@ -127,24 +123,19 @@ def saida_codigo_barras(request):
 
     if request.method == "POST":
         codigo = request.POST.get("codigo_barras", "").strip()
-        qtd_raw = request.POST.get("quantidade", "").strip()
-
-        # Validação de campo vazio
-        if not qtd_raw:
-            messages.error(request, "Macario, você esqueceu de digitar a quantidade!")
-            return render(request, "estoque/saida_codigo.html", {"form": form})
-
-        # Conversão robusta de número
-        try:
-            quantidade = int(qtd_raw)
-            if quantidade <= 0:
-                raise ValueError
-        except ValueError:
-            messages.error(request, "Informe uma quantidade válida (número inteiro maior que 0).")
-            return render(request, "estoque/saida_codigo.html", {"form": form})
+        # Volta a aceitar "1" como padrão se vier vazio
+        qtd_str = request.POST.get("quantidade", "1").strip() or "1"
 
         if not codigo:
             messages.error(request, "Produto não selecionado ou código vazio.")
+            return render(request, "estoque/saida_codigo.html", {"form": form})
+
+        try:
+            quantidade = int(qtd_str)
+            if quantidade <= 0:
+                raise ValueError
+        except ValueError:
+            messages.error(request, "Informe uma quantidade válida.")
             return render(request, "estoque/saida_codigo.html", {"form": form})
 
         try:
@@ -313,10 +304,6 @@ def vendas_hoje(request):
         total += total_linha
 
     return render(request, "estoque/vendas_hoje.html", {"hoje": hoje, "itens": itens, "total": _money(total), "total_vendas": itens_qs.count()})
-
-@login_required
-def vendas_periodo(request):
-    return relatorios(request)
 
 # =========================
 # BAIXAR RELATÓRIO CSV
