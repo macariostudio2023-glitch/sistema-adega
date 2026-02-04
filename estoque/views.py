@@ -46,7 +46,7 @@ def _get_range_mes_atual():
     tz = timezone.get_current_timezone()
     hoje = timezone.localdate()
     inicio_mes = hoje.replace(day=1)
-    ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+    ultimo_dia = calendar.monthrange(hoje.year, hoye.month)[1]
     fim_mes = hoje.replace(day=ultimo_dia)
     
     dt_inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
@@ -112,12 +112,17 @@ def entrada_codigo_barras(request):
     return render(request, "estoque/entrada_codigo.html", {"form": form})
 
 # =========================
-# SAÍDA POR CÓDIGO
+# SAÍDA POR CÓDIGO (ATUALIZADO PARA INICIAR COM QUANTIDADE 0)
 # =========================
 @login_required
 def saida_codigo_barras(request):
     adega = get_adega_atual(request)
-    form = SaidaCodigoBarrasForm(request.POST or None)
+    
+    # Forçamos o valor inicial do campo quantidade para 0
+    if request.method == "POST":
+        form = SaidaCodigoBarrasForm(request.POST)
+    else:
+        form = SaidaCodigoBarrasForm(initial={'quantidade': 0})
 
     if request.method == "POST":
         if not form.is_valid():
@@ -126,6 +131,11 @@ def saida_codigo_barras(request):
 
         codigo = form.cleaned_data["codigo_barras"].strip()
         quantidade = form.cleaned_data["quantidade"]
+
+        # Garantia extra de que a venda não seja zero
+        if quantidade <= 0:
+            messages.error(request, "A quantidade deve ser maior que zero.")
+            return render(request, "estoque/saida_codigo.html", {"form": form})
 
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
@@ -149,7 +159,9 @@ def saida_codigo_barras(request):
 
         valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_venda))
         messages.success(request, f"✅ Venda registrada!\n{produto.nome}\nR$ {valor_total}")
-        form = SaidaCodigoBarrasForm()
+        
+        # Reinicia o formulário com quantidade 0 para a próxima venda
+        form = SaidaCodigoBarrasForm(initial={'quantidade': 0})
 
     return render(request, "estoque/saida_codigo.html", {"form": form})
 
@@ -190,7 +202,7 @@ def novo_produto(request):
     return render(request, "estoque/novo_produto.html", {"form": form})
 
 # =========================
-# RELATÓRIOS (VERSÃO FINAL ELEGANTE)
+# RELATÓRIOS
 # =========================
 @login_required
 def relatorios(request):
@@ -253,7 +265,7 @@ def estoque_baixo(request):
     return render(request, "estoque/estoque_baixo.html", {"form": form, "limite": limite, "produtos": produtos})
 
 # =========================
-# CONSULTA DE ESTOQUE (ATUALIZADO COM PREÇO DE VENDA)
+# CONSULTA DE ESTOQUE (FIX PREÇO DE VENDA)
 # =========================
 @login_required
 def consultar_estoque(request):
@@ -264,7 +276,6 @@ def consultar_estoque(request):
         Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)
     ).order_by("nome")[:10]
     
-    # Adicionamos "preco_venda" explicitamente para o JavaScript ler
     dados = [
         {
             "nome": p.nome, 
