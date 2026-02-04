@@ -8,12 +8,13 @@
 
   <h2>🧾 Saída / Venda</h2>
 
-  <label>Buscar produto pelo nome</label>
+  <label>Buscar produto (Nome ou Código de Barras)</label>
   <input
     type="text"
     id="busca-produto"
-    placeholder="Digite o nome do produto"
+    placeholder="Bipe o código ou digite o nome..."
     autocomplete="off"
+    style="margin-bottom: 5px;"
   >
 
   <ul id="resultado-busca" style="list-style:none; padding:0; margin-top:8px;"></ul>
@@ -39,11 +40,12 @@
     <div id="prev-erro" style="margin-top:8px; color:#fecaca; font-weight:700;"></div>
   </div>
 
-  <form method="post">
+  <form method="post" id="form-venda">
     {% csrf_token %}
 
-    <label>Código de barras</label>
-    {{ form.codigo_barras }}
+    <div style="display: none;">
+        {{ form.codigo_barras }}
+    </div>
 
     <label>Quantidade</label>
     {{ form.quantidade }}
@@ -58,16 +60,16 @@
 <script>
 const inputBusca = document.getElementById("busca-produto");
 const lista = document.getElementById("resultado-busca");
-const campoCodigo = document.getElementById("id_codigo_barras");
+const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 
-// ✅ Elementos da Prévia
+// Elementos da Prévia
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
 const prevTotal = document.getElementById("prev-total");
 const prevErro = document.getElementById("prev-erro");
 
-let precoUnitarioAtual = 0; // Armazena o preço para cálculo rápido
+let precoUnitarioAtual = 0;
 
 function dinheiroBR(valor){
   const n = Number(valor) || 0;
@@ -80,103 +82,70 @@ function limparPrevia(){
   prevTotal.innerText = "R$ 0,00";
   prevErro.innerText = "";
   precoUnitarioAtual = 0;
+  campoCodigoHidden.value = "";
 }
 
-// Faz o cálculo matemático sem precisar ir no servidor de novo
 function recalcularTotal() {
   const qtd = parseInt(campoQtd.value) || 0;
   const total = precoUnitarioAtual * qtd;
   prevTotal.innerText = "R$ " + dinheiroBR(total);
-  
-  if (qtd <= 0 && campoCodigo.value !== "") {
-    prevErro.innerText = "Insira a quantidade.";
-  } else {
-    prevErro.innerText = "";
-  }
 }
 
-let timerPrevia = null;
-function atualizarPrevia(){
-  const codigo = (campoCodigo.value || "").trim();
-  const qtd = parseInt(campoQtd.value) || 0;
+let timerBusca = null;
+inputBusca.addEventListener("input", function(){
+  const termo = inputBusca.value.trim();
 
-  if(!codigo){
-    limparPrevia();
+  if(termo.length < 2){
+    lista.innerHTML = "";
+    if(termo.length === 0) limparPrevia();
     return;
   }
 
-  clearTimeout(timerPrevia);
-  timerPrevia = setTimeout(() => {
-    fetch(`/consultar-estoque/?q=${encodeURIComponent(codigo)}`)
+  clearTimeout(timerBusca);
+  timerBusca = setTimeout(() => {
+    fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
       .then(res => res.json())
       .then(dados => {
-        if(!dados || dados.length === 0){
+        lista.innerHTML = "";
+        
+        // Se for um "bip" certeiro (código de barras exato)
+        if(dados.length === 1 && dados[0].codigo === termo) {
+            selecionarProduto(dados[0]);
+            return;
+        }
+
+        if(dados.length === 0){
           prevErro.innerText = "Produto não encontrado.";
-          limparPrevia();
           return;
         }
 
-        const p = dados[0];
-        // Busca a chave 'preco_venda' que adicionamos no Python
-        precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
-        
-        prevNome.innerText = p.nome || "—";
-        prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
-        
-        recalcularTotal(); // Calcula o total inicial
-      })
-      .catch(() => {
-        prevErro.innerText = "Erro ao consultar o produto.";
+        dados.forEach(p => {
+          const li = document.createElement("li");
+          li.innerHTML = `<strong>${p.nome}</strong><br><small>Qtd: ${p.estoque} | R$ ${p.preco_venda}</small>`;
+          li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
+          li.onclick = () => selecionarProduto(p);
+          lista.appendChild(li);
+        });
       });
-  }, 200);
-}
-
-// Eventos para atualizar a tela
-campoCodigo.addEventListener("input", atualizarPrevia);
-
-// Quando mudar a quantidade, apenas recalcula o total (mais rápido)
-campoQtd.addEventListener("input", recalcularTotal);
-campoQtd.addEventListener("change", recalcularTotal);
-
-// 🔍 Busca por nome
-inputBusca.addEventListener("keyup", function(){
-  const termo = inputBusca.value.trim();
-  if(termo.length < 2){
-    lista.innerHTML = "";
-    return;
-  }
-
-  fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
-    .then(res => res.json())
-    .then(dados => {
-      lista.innerHTML = "";
-      if(dados.length === 0) return;
-
-      dados.forEach(p => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <strong>${p.nome}</strong>
-          <br>
-          <small>Estoque: ${p.estoque} | R$ ${p.preco_venda || p.preco}</small>
-        `;
-        li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
-
-        li.onclick = () => {
-          campoCodigo.value = p.codigo;
-          lista.innerHTML = "";
-          inputBusca.value = p.nome;
-          
-          // Foca na quantidade e seleciona o texto para o vendedor só digitar o número
-          atualizarPrevia();
-          campoQtd.focus();
-          campoQtd.select(); 
-        };
-        lista.appendChild(li);
-      });
-    });
+  }, 300);
 });
 
-// Inicialização
-window.onload = atualizarPrevia;
+function selecionarProduto(p) {
+    precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
+    prevNome.innerText = p.nome;
+    prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
+    campoCodigoHidden.value = p.codigo;
+    inputBusca.value = p.nome;
+    lista.innerHTML = "";
+    prevErro.innerText = "";
+    
+    recalcularTotal();
+    
+    // Foca na quantidade para o vendedor digitar
+    campoQtd.focus();
+    campoQtd.select();
+}
+
+campoQtd.addEventListener("input", recalcularTotal);
 </script>
 {% endblock %}
