@@ -82,17 +82,21 @@ def home(request):
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
-    form = EntradaCodigoBarrasForm(request.POST or None)
+    form = EntradaCodigoBarrasForm()
 
     if request.method == "POST":
-        # Usando lógica direta para evitar erros de validação chatos
         codigo = request.POST.get("codigo_barras", "").strip()
-        qtd_str = request.POST.get("quantidade", "0")
+        qtd_raw = request.POST.get("quantidade", "").strip()
         
+        if not qtd_raw:
+            messages.error(request, "Por favor, digite a quantidade para a entrada.")
+            return render(request, "estoque/entrada_codigo.html", {"form": form})
+
         try:
-            quantidade = int(qtd_str)
+            quantidade = int(qtd_raw)
+            if quantidade <= 0: raise ValueError
         except ValueError:
-            messages.error(request, "Quantidade inválida.")
+            messages.error(request, "Quantidade inválida. Use números inteiros (1, 2, 5...).")
             return render(request, "estoque/entrada_codigo.html", {"form": form})
 
         if not codigo:
@@ -114,7 +118,7 @@ def entrada_codigo_barras(request):
     return render(request, "estoque/entrada_codigo.html", {"form": form})
 
 # =========================
-# SAÍDA POR CÓDIGO (Venda) - VERSÃO FINAL BLINDADA
+# SAÍDA POR CÓDIGO (Venda) - VERSÃO BLINDADA
 # =========================
 @login_required
 def saida_codigo_barras(request):
@@ -122,24 +126,27 @@ def saida_codigo_barras(request):
     form = SaidaCodigoBarrasForm()
 
     if request.method == "POST":
-        # Lendo direto do POST para ignorar erros de validação do formulário Django
         codigo = request.POST.get("codigo_barras", "").strip()
-        qtd_str = request.POST.get("quantidade", "").strip()
+        qtd_raw = request.POST.get("quantidade", "").strip()
 
-        # Validação manual básica
-        if not codigo:
-            messages.error(request, "Produto não selecionado ou código vazio.")
+        # Validação de campo vazio
+        if not qtd_raw:
+            messages.error(request, "Macario, você esqueceu de digitar a quantidade!")
             return render(request, "estoque/saida_codigo.html", {"form": form})
 
+        # Conversão robusta de número
         try:
-            quantidade = int(qtd_str)
+            quantidade = int(qtd_raw)
             if quantidade <= 0:
                 raise ValueError
         except ValueError:
             messages.error(request, "Informe uma quantidade válida (número inteiro maior que 0).")
             return render(request, "estoque/saida_codigo.html", {"form": form})
 
-        # Processamento da Venda
+        if not codigo:
+            messages.error(request, "Produto não selecionado ou código vazio.")
+            return render(request, "estoque/saida_codigo.html", {"form": form})
+
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
             
@@ -356,4 +363,3 @@ def admin_gate_check(request):
         request.session["admin_gate_ok"] = True
         return JsonResponse({"ok": True}, status=200)
     return JsonResponse({"ok": False}, status=401)
-
