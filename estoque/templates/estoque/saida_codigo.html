@@ -8,7 +8,6 @@
 
   <h2>🧾 Saída / Venda</h2>
 
-  <!-- 🔍 BUSCA POR NOME -->
   <label>Buscar produto pelo nome</label>
   <input
     type="text"
@@ -21,7 +20,6 @@
 
   <hr style="margin:20px 0;">
 
-  <!-- ✅ PRÉVIA DO VALOR (ANTES DE CONFIRMAR) -->
   <div
     style="
       background:rgba(2,6,23,0.55);
@@ -36,12 +34,11 @@
     <div>Produto: <span id="prev-nome" style="font-weight:700;">—</span></div>
     <div>Preço unitário: <span id="prev-unit" style="font-weight:700;">R$ 0,00</span></div>
     <div style="margin-top:8px; font-size:18px;">
-      Total: <span id="prev-total" style="font-weight:900;">R$ 0,00</span>
+      Total: <span id="prev-total" style="font-weight:900; color:#4ade80;">R$ 0,00</span>
     </div>
     <div id="prev-erro" style="margin-top:8px; color:#fecaca; font-weight:700;"></div>
   </div>
 
-  <!-- FORM DE SAÍDA -->
   <form method="post">
     {% csrf_token %}
 
@@ -51,7 +48,7 @@
     <label>Quantidade</label>
     {{ form.quantidade }}
 
-    <button type="submit">
+    <button type="submit" style="margin-top: 15px;">
       ✅ Confirmar Venda
     </button>
   </form>
@@ -64,11 +61,13 @@ const lista = document.getElementById("resultado-busca");
 const campoCodigo = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 
-// ✅ Prévia (antes de confirmar)
+// ✅ Elementos da Prévia
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
 const prevTotal = document.getElementById("prev-total");
 const prevErro = document.getElementById("prev-erro");
+
+let precoUnitarioAtual = 0; // Armazena o preço para cálculo rápido
 
 function dinheiroBR(valor){
   const n = Number(valor) || 0;
@@ -80,23 +79,29 @@ function limparPrevia(){
   prevUnit.innerText = "R$ 0,00";
   prevTotal.innerText = "R$ 0,00";
   prevErro.innerText = "";
+  precoUnitarioAtual = 0;
+}
+
+// Faz o cálculo matemático sem precisar ir no servidor de novo
+function recalcularTotal() {
+  const qtd = parseInt(campoQtd.value) || 0;
+  const total = precoUnitarioAtual * qtd;
+  prevTotal.innerText = "R$ " + dinheiroBR(total);
+  
+  if (qtd <= 0 && campoCodigo.value !== "") {
+    prevErro.innerText = "Insira a quantidade.";
+  } else {
+    prevErro.innerText = "";
+  }
 }
 
 let timerPrevia = null;
 function atualizarPrevia(){
   const codigo = (campoCodigo.value || "").trim();
-  const qtd = parseInt((campoQtd && campoQtd.value) ? campoQtd.value : "1", 10);
-
-  prevErro.innerText = "";
+  const qtd = parseInt(campoQtd.value) || 0;
 
   if(!codigo){
     limparPrevia();
-    return;
-  }
-
-  if(!qtd || qtd <= 0){
-    prevErro.innerText = "Quantidade inválida.";
-    prevTotal.innerText = "R$ 0,00";
     return;
   }
 
@@ -112,35 +117,30 @@ function atualizarPrevia(){
         }
 
         const p = dados[0];
-
-        // p.preco vem como string (ex: "6.80" ou "6,80"). vamos garantir parse.
-        const preco = parseFloat(String(p.preco).replace(",", ".")) || 0;
-        const total = preco * qtd;
-
+        // Busca a chave 'preco_venda' que adicionamos no Python
+        precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
+        
         prevNome.innerText = p.nome || "—";
-        prevUnit.innerText = "R$ " + dinheiroBR(preco);
-        prevTotal.innerText = "R$ " + dinheiroBR(total);
-
-        // Se quiser avisar estoque antes de confirmar (opcional):
-        // if (typeof p.estoque !== "undefined" && Number(p.estoque) < qtd) {
-        //   prevErro.innerText = `Atenção: estoque atual ${p.estoque}.`;
-        // }
+        prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
+        
+        recalcularTotal(); // Calcula o total inicial
       })
       .catch(() => {
         prevErro.innerText = "Erro ao consultar o produto.";
       });
-  }, 180);
+  }, 200);
 }
 
-// Atualiza prévia quando digitar código ou mudar quantidade
+// Eventos para atualizar a tela
 campoCodigo.addEventListener("input", atualizarPrevia);
-if (campoQtd) campoQtd.addEventListener("input", atualizarPrevia);
 
+// Quando mudar a quantidade, apenas recalcula o total (mais rápido)
+campoQtd.addEventListener("input", recalcularTotal);
+campoQtd.addEventListener("change", recalcularTotal);
 
-// 🔍 Busca por nome (seu código + pequenas melhorias)
+// 🔍 Busca por nome
 inputBusca.addEventListener("keyup", function(){
   const termo = inputBusca.value.trim();
-
   if(termo.length < 2){
     lista.innerHTML = "";
     return;
@@ -150,50 +150,33 @@ inputBusca.addEventListener("keyup", function(){
     .then(res => res.json())
     .then(dados => {
       lista.innerHTML = "";
-
-      if(dados.length === 0){
-        lista.innerHTML = "<li>Produto não encontrado</li>";
-        return;
-      }
+      if(dados.length === 0) return;
 
       dados.forEach(p => {
         const li = document.createElement("li");
         li.innerHTML = `
           <strong>${p.nome}</strong>
           <br>
-          <small>Estoque: ${p.estoque} | R$ ${p.preco}</small>
+          <small>Estoque: ${p.estoque} | R$ ${p.preco_venda || p.preco}</small>
         `;
-        li.style.padding = "10px";
-        li.style.border = "1px solid #374151";
-        li.style.borderRadius = "8px";
-        li.style.marginBottom = "6px";
-        li.style.cursor = "pointer";
+        li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
 
         li.onclick = () => {
           campoCodigo.value = p.codigo;
           lista.innerHTML = "";
           inputBusca.value = p.nome;
-
-          // ✅ Atualiza prévia automaticamente ao selecionar um produto
+          
+          // Foca na quantidade e seleciona o texto para o vendedor só digitar o número
           atualizarPrevia();
-
-          // coloca foco na quantidade para agilizar
-          if (campoQtd) campoQtd.focus();
+          campoQtd.focus();
+          campoQtd.select(); 
         };
-
         lista.appendChild(li);
       });
     });
 });
 
-// Se a página abrir já com valores (ou ao colar código), atualiza
-atualizarPrevia();
+// Inicialização
+window.onload = atualizarPrevia;
 </script>
-
 {% endblock %}
-
-
-
-
-
-
