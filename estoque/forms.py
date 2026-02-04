@@ -1,10 +1,7 @@
 from datetime import timedelta
-
 from django import forms
 from django.utils import timezone
-
 from .models import Categoria
-
 
 class EntradaCodigoBarrasForm(forms.Form):
     codigo_barras = forms.CharField(
@@ -18,7 +15,8 @@ class EntradaCodigoBarrasForm(forms.Form):
     quantidade = forms.IntegerField(
         label="Quantidade",
         min_value=1,
-        initial=1
+        initial=None,  # ✅ Removido o 1 para não salvar automático
+        widget=forms.NumberInput(attrs={'placeholder': '0', 'value': ''}) # ✅ Força campo vazio
     )
 
 
@@ -34,7 +32,8 @@ class SaidaCodigoBarrasForm(forms.Form):
     quantidade = forms.IntegerField(
         label="Quantidade",
         min_value=1,
-        initial=1
+        initial=None,  # ✅ Removido o 1 para não salvar automático
+        widget=forms.NumberInput(attrs={'placeholder': '0', 'value': ''}) # ✅ Força campo vazio
     )
 
 
@@ -78,7 +77,6 @@ class FiltroEstoqueBaixoForm(forms.Form):
 
 
 class FiltroPeriodoVendasForm(forms.Form):
-    # ✅ Agora NÃO é obrigatório (relatório automático)
     data_inicio = forms.DateField(
         label="Data inicial",
         required=False,
@@ -90,7 +88,6 @@ class FiltroPeriodoVendasForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"})
     )
 
-    # ✅ Preenche automaticamente quando abre sem datas
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.data.get("data_inicio") and not self.data.get("data_fim"):
