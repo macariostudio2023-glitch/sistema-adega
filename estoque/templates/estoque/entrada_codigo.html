@@ -6,9 +6,9 @@
 {% block content %}
 <div class="centered-card">
 
-  <h2 style="text-align:center;">📦 Entrada por Código de Barras</h2>
+  <h2 style="text-align:center;">📦 Entrada de Estoque</h2>
   <p style="text-align:center; margin-top:6px; font-size: 0.9em; opacity: 0.8;">
-    APONTE O LEITOR E CONFIRME A ENTRADA
+    {% if produto %} CONFIRME OS DADOS ABAIXO {% else %} APONTE O LEITOR PARA LOCALIZAR {% endif %}
   </p>
 
   {% if messages %}
@@ -28,20 +28,36 @@
     <div style="display: flex; gap: 5px;">
         <input type="text" name="codigo_barras" id="id_codigo_barras" 
                inputmode="none" required autofocus 
+               value="{{ codigo }}"
                style="flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
         
         <button type="button" id="btn-consulta" style="width: 50px; background: #4b5563; padding: 0;">🔎</button>
     </div>
 
-    <label style="text-align:left; margin-top: 15px; display: block;">Quantidade</label>
-    {{ form.quantidade }}
+    {% if produto %}
+    <div style="margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(37, 99, 235, 0.1); border: 1px solid #2563eb;">
+        <h3 style="margin: 0; color: #60a5fa;">{{ produto.nome }}</h3>
+        <p style="margin: 5px 0; opacity: 0.8;">Estoque atual: <strong>{{ produto.estoque_atual }}</strong></p>
+        
+        <label style="text-align:left; margin-top: 10px; display: block;">Quantidade a adicionar</label>
+        <input type="number" name="quantidade" value="1" min="1"
+               style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
-    <button type="submit" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #2563eb;">
-        Confirmar Entrada
+        <button type="submit" name="confirmar" value="true" 
+                style="margin-top: 15px; width: 100%; padding: 15px; font-size: 1.1em; background: #22c55e; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;">
+            ✅ CONFIRMAR ENTRADA
+        </button>
+        
+        <a href="{% url 'entrada_codigo' %}" style="display:block; text-align:center; margin-top:10px; color:#9ca3af; text-decoration:none; font-size:0.9em;">Cancelar</a>
+    </div>
+    {% else %}
+    <button type="submit" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #2563eb; border: none; border-radius: 8px; color: white; cursor: pointer;">
+        BUSCAR PRODUTO
     </button>
+    {% endif %}
 
     <div class="hint" style="text-align:center; margin-top: 15px;">
-      Bipou → ENTER confirma | Toque na 🔎 para buscar
+      Bipou → Localiza | Confirmar → Entra no estoque
     </div>
   </form>
 
@@ -55,7 +71,7 @@
     type="text"
     id="busca-produto"
     placeholder="Digite nome ou código..."
-    style="margin-bottom:10px; text-align:center; width: 100%; padding: 12px;"
+    style="margin-bottom:10px; text-align:center; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;"
   >
 
   <div id="resultado-estoque"></div>
@@ -65,49 +81,22 @@
 <script>
   const campoCodigo = document.getElementById("id_codigo_barras");
   const campoBusca = document.getElementById("busca-produto");
-  const form = document.getElementById("entradaForm");
-  const resultado = document.getElementById("resultado-estoque");
   const btnConsulta = document.getElementById("btn-consulta");
+  const resultado = document.getElementById("resultado-estoque");
 
-  // ✅ FOCO AUTOMÁTICO E TRAVA TECLADO
   window.onload = function () {
     if (campoCodigo) {
         campoCodigo.focus();
-        campoCodigo.inputMode = "none"; // Garante que o Android não abra o teclado
+        campoCodigo.inputMode = "none";
     }
   };
 
-  // ✅ CLICK NA LUPA (Substitui F2 no Tablet)
   btnConsulta.addEventListener("click", function() {
       campoBusca.focus();
       campoBusca.scrollIntoView({behavior: "smooth"});
   });
 
-  // ✅ ENTER DO LEITOR
-  if (campoCodigo) {
-    campoCodigo.addEventListener("keydown", function(e){
-      if (e.key === "Enter") {
-        // Se o código estiver vazio, não deixa enviar
-        if(this.value.trim() === "") {
-            e.preventDefault();
-            return;
-        }
-        // Se quiser que o leitor envie o form direto:
-        form.submit();
-      }
-    });
-  }
-
-  // ✅ F2 CONTINUA FUNCIONANDO (Caso usem teclado físico)
-  document.addEventListener("keydown", function(e){
-    if (e.key === "F2") {
-      e.preventDefault();
-      campoBusca.focus();
-      campoBusca.select();
-    }
-  });
-
-  // ✅ BUSCA AJAX (Debounce)
+  // Busca automática (Debounce)
   let timer = null;
   campoBusca.addEventListener("input", function () {
     const termo = this.value.trim();
@@ -120,7 +109,6 @@
       resultado.innerHTML = "";
       return;
     }
-
     fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
       .then(res => res.json())
       .then(dados => {
@@ -128,15 +116,12 @@
           resultado.innerHTML = `<div style="padding:12px; border-radius:12px; text-align:center; background:rgba(239,68,68,.15);">Não encontrado.</div>`;
           return;
         }
-
         let html = "<ul style='list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;'>";
         dados.forEach(p => {
-          const estoqueBaixo = Number(p.estoque) <= 5;
           html += `
             <li onclick="selecionarProduto('${p.codigo}')" style="cursor:pointer; padding:12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center;">
               <div style="font-weight:bold;">${p.nome}</div>
-              <div style="font-size:0.9em; opacity:.8;">Cod: ${p.codigo || "-"} | R$ ${p.preco}</div>
-              <div style="font-weight:bold; color:${estoqueBaixo ? '#f87171' : '#a7f3d0'};">Estoque: ${p.estoque}</div>
+              <div style="font-weight:bold; color:#a7f3d0;">Estoque: ${p.estoque}</div>
             </li>`;
         });
         html += "</ul>";
@@ -145,10 +130,8 @@
   }
 
   function selecionarProduto(codigo){
-    if(!codigo || !campoCodigo) return;
     campoCodigo.value = codigo;
-    campoCodigo.focus();
-    window.scrollTo({top: 0, behavior: 'smooth'});
+    document.getElementById("entradaForm").submit();
   }
 </script>
 {% endblock %}
