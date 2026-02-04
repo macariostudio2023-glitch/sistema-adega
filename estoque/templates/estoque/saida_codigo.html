@@ -48,7 +48,7 @@
     </div>
 
     <label>Quantidade</label>
-    <input type="number" name="quantidade" id="id_quantidade" class="form-control" required min="1">
+    <input type="number" name="quantidade" id="id_quantidade" class="form-control" required min="1" placeholder="0">
 
     <button type="submit" id="btn-confirmar" style="margin-top: 15px;">
       ✅ Confirmar Venda
@@ -83,7 +83,7 @@ function limparPrevia(){
   prevErro.innerText = "";
   precoUnitarioAtual = 0;
   campoCodigoHidden.value = "";
-  campoQtd.value = ""; // Limpa a quantidade ao resetar
+  campoQtd.value = "";
 }
 
 function recalcularTotal() {
@@ -92,12 +92,17 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// Bloqueia o Enter do leitor no campo de busca
-inputBusca.addEventListener("keydown", function(e) {
-  if (e.key === "Enter") {
-    e.preventDefault();
+// 🛑 TRAVA DEFINITIVA: Impede o Enter de enviar o formulário em qualquer lugar da página
+window.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.target.nodeName !== 'TEXTAREA') {
+    // Se o foco estiver na Quantidade, o Enter até poderia salvar, 
+    // mas para garantir que você veja o preço, vamos bloquear tudo.
+    if (e.target.id !== 'btn-confirmar') {
+        e.preventDefault();
+        return false;
+    }
   }
-});
+}, True);
 
 let timerBusca = null;
 inputBusca.addEventListener("input", function(){
@@ -116,7 +121,7 @@ inputBusca.addEventListener("input", function(){
       .then(dados => {
         lista.innerHTML = "";
         
-        if(dados.length === 1 && dados[0].codigo === termo) {
+        if(dados.length === 1 && (dados[0].codigo === termo)) {
             selecionarProduto(dados[0]);
             return;
         }
@@ -142,27 +147,17 @@ function selecionarProduto(p) {
     prevNome.innerText = p.nome;
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
-    inputBusca.value = p.nome;
+    inputBusca.value = p.nome; // Preenche o nome para o usuário saber o que bipou
     lista.innerHTML = "";
     prevErro.innerText = "";
     
-    // ✅ GARANTE QUE O CAMPO FIQUE VAZIO AO SELECIONAR NOVO PRODUTO
     campoQtd.value = ""; 
     recalcularTotal();
     
     setTimeout(() => {
         campoQtd.focus();
-    }, 100);
+    }, 150);
 }
-
-formVenda.addEventListener("submit", function(e) {
-  const qtd = parseInt(campoQtd.value) || 0;
-  if (qtd <= 0) {
-    e.preventDefault();
-    alert("Macario, informe a quantidade primeiro!");
-    campoQtd.focus();
-  }
-});
 
 campoQtd.addEventListener("input", recalcularTotal);
 </script>
