@@ -48,9 +48,9 @@
     </div>
 
     <label>Quantidade</label>
-    {{ form.quantidade }}
+    <input type="number" name="quantidade" id="id_quantidade" class="form-control" required min="1">
 
-    <button type="submit" style="margin-top: 15px;">
+    <button type="submit" id="btn-confirmar" style="margin-top: 15px;">
       ✅ Confirmar Venda
     </button>
   </form>
@@ -62,8 +62,8 @@ const inputBusca = document.getElementById("busca-produto");
 const lista = document.getElementById("resultado-busca");
 const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
+const formVenda = document.getElementById("form-venda");
 
-// Elementos da Prévia
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
 const prevTotal = document.getElementById("prev-total");
@@ -83,6 +83,7 @@ function limparPrevia(){
   prevErro.innerText = "";
   precoUnitarioAtual = 0;
   campoCodigoHidden.value = "";
+  campoQtd.value = ""; // Limpa a quantidade ao resetar
 }
 
 function recalcularTotal() {
@@ -90,6 +91,13 @@ function recalcularTotal() {
   const total = precoUnitarioAtual * qtd;
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
+
+// Bloqueia o Enter do leitor no campo de busca
+inputBusca.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+  }
+});
 
 let timerBusca = null;
 inputBusca.addEventListener("input", function(){
@@ -108,7 +116,6 @@ inputBusca.addEventListener("input", function(){
       .then(dados => {
         lista.innerHTML = "";
         
-        // Se for um "bip" certeiro (código de barras exato)
         if(dados.length === 1 && dados[0].codigo === termo) {
             selecionarProduto(dados[0]);
             return;
@@ -127,7 +134,7 @@ inputBusca.addEventListener("input", function(){
           lista.appendChild(li);
         });
       });
-  }, 300);
+  }, 250);
 });
 
 function selecionarProduto(p) {
@@ -139,12 +146,23 @@ function selecionarProduto(p) {
     lista.innerHTML = "";
     prevErro.innerText = "";
     
+    // ✅ GARANTE QUE O CAMPO FIQUE VAZIO AO SELECIONAR NOVO PRODUTO
+    campoQtd.value = ""; 
     recalcularTotal();
     
-    // Foca na quantidade para o vendedor digitar
-    campoQtd.focus();
-    campoQtd.select();
+    setTimeout(() => {
+        campoQtd.focus();
+    }, 100);
 }
+
+formVenda.addEventListener("submit", function(e) {
+  const qtd = parseInt(campoQtd.value) || 0;
+  if (qtd <= 0) {
+    e.preventDefault();
+    alert("Macario, informe a quantidade primeiro!");
+    campoQtd.focus();
+  }
+});
 
 campoQtd.addEventListener("input", recalcularTotal);
 </script>
