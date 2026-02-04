@@ -82,75 +82,85 @@ def home(request):
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
-    # ✅ Alterado para nascer limpo
     form = EntradaCodigoBarrasForm(request.POST or None)
 
     if request.method == "POST":
-        if form.is_valid():
-            codigo = form.cleaned_data["codigo_barras"].strip()
-            quantidade = form.cleaned_data["quantidade"]
+        # Usando lógica direta para evitar erros de validação chatos
+        codigo = request.POST.get("codigo_barras", "").strip()
+        qtd_str = request.POST.get("quantidade", "0")
+        
+        try:
+            quantidade = int(qtd_str)
+        except ValueError:
+            messages.error(request, "Quantidade inválida.")
+            return render(request, "estoque/entrada_codigo.html", {"form": form})
 
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
-            except Produto.DoesNotExist:
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
+        if not codigo:
+            messages.error(request, "Código de barras não informado.")
+            return render(request, "estoque/entrada_codigo.html", {"form": form})
 
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
             Movimentacao.objects.create(
-                adega=adega,
-                produto=produto,
-                tipo="ENTRADA",
-                quantidade=quantidade,
-                data=timezone.now(),
+                adega=adega, produto=produto, tipo="ENTRADA",
+                quantidade=quantidade, data=timezone.now(),
                 observacao="Entrada via leitor"
             )
-
             messages.success(request, f"✅ Entrada registrada: {produto.nome}")
             return redirect("entrada_codigo")
-        else:
-            messages.error(request, "Erro no formulário. Verifique os dados.")
+        except Produto.DoesNotExist:
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
 
     return render(request, "estoque/entrada_codigo.html", {"form": form})
 
 # =========================
-# SAÍDA POR CÓDIGO (Venda)
+# SAÍDA POR CÓDIGO (Venda) - VERSÃO FINAL BLINDADA
 # =========================
 @login_required
 def saida_codigo_barras(request):
     adega = get_adega_atual(request)
-    # ✅ Agora sem initial=0, nasce totalmente vazio
-    form = SaidaCodigoBarrasForm(request.POST or None)
+    form = SaidaCodigoBarrasForm()
 
     if request.method == "POST":
-        if form.is_valid():
-            codigo = form.cleaned_data["codigo_barras"].strip()
-            quantidade = form.cleaned_data["quantidade"]
+        # Lendo direto do POST para ignorar erros de validação do formulário Django
+        codigo = request.POST.get("codigo_barras", "").strip()
+        qtd_str = request.POST.get("quantidade", "").strip()
 
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
-            except Produto.DoesNotExist:
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
+        # Validação manual básica
+        if not codigo:
+            messages.error(request, "Produto não selecionado ou código vazio.")
+            return render(request, "estoque/saida_codigo.html", {"form": form})
 
+        try:
+            quantidade = int(qtd_str)
+            if quantidade <= 0:
+                raise ValueError
+        except ValueError:
+            messages.error(request, "Informe uma quantidade válida (número inteiro maior que 0).")
+            return render(request, "estoque/saida_codigo.html", {"form": form})
+
+        # Processamento da Venda
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+            
             with transaction.atomic():
                 produto.refresh_from_db()
                 if produto.estoque_atual < quantidade:
-                    messages.error(request, f"Estoque insuficiente. Atual: {produto.estoque_atual}")
+                    messages.error(request, f"Estoque insuficiente. Disponível: {produto.estoque_atual}")
                     return render(request, "estoque/saida_codigo.html", {"form": form})
 
                 Movimentacao.objects.create(
-                    adega=adega,
-                    produto=produto,
-                    tipo="SAIDA",
-                    quantidade=quantidade,
-                    data=timezone.now(),
+                    adega=adega, produto=produto, tipo="SAIDA",
+                    quantidade=quantidade, data=timezone.now(),
                     observacao="Venda via leitor"
                 )
 
             valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_venda))
             messages.success(request, f"✅ Venda registrada! {produto.nome} - Total: R$ {valor_total}")
-            # ✅ Redireciona para si mesmo para limpar o formulário por completo
             return redirect("saida_codigo_barras")
-        else:
-            messages.error(request, "Quantidade inválida. Informe pelo menos 1.")
+
+        except Produto.DoesNotExist:
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
 
     return render(request, "estoque/saida_codigo.html", {"form": form})
 
@@ -346,3 +356,4 @@ def admin_gate_check(request):
         request.session["admin_gate_ok"] = True
         return JsonResponse({"ok": True}, status=200)
     return JsonResponse({"ok": False}, status=401)
+
