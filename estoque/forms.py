@@ -15,25 +15,26 @@ class EntradaCodigoBarrasForm(forms.Form):
     quantidade = forms.IntegerField(
         label="Quantidade",
         min_value=1,
-        initial=None,  # ✅ Removido o 1 para não salvar automático
-        widget=forms.NumberInput(attrs={'placeholder': '0', 'value': ''}) # ✅ Força campo vazio
+        required=True,
+        widget=forms.NumberInput(attrs={'placeholder': '0'})
     )
 
 
 class SaidaCodigoBarrasForm(forms.Form):
+    # ✅ CORREÇÃO: Mudado para HiddenInput para bater com o <input type="hidden"> do seu HTML
     codigo_barras = forms.CharField(
-        label="Código de barras",
-        max_length=60,
-        widget=forms.TextInput(attrs={
-            "autofocus": True,
-            "placeholder": "Passe o leitor aqui"
-        })
+        widget=forms.HiddenInput(attrs={'id': 'id_codigo_barras'})
     )
+    # ✅ CORREÇÃO: Removido initial=None que causava erro de validação
     quantidade = forms.IntegerField(
         label="Quantidade",
         min_value=1,
-        initial=None,  # ✅ Removido o 1 para não salvar automático
-        widget=forms.NumberInput(attrs={'placeholder': '0', 'value': ''}) # ✅ Força campo vazio
+        required=True,
+        widget=forms.NumberInput(attrs={
+            'id': 'id_quantidade',
+            'placeholder': '0',
+            'class': 'form-control'
+        })
     )
 
 
