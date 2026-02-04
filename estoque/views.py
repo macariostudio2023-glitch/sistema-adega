@@ -350,3 +350,6 @@ def admin_gate_check(request):
         request.session["admin_gate_ok"] = True
         return JsonResponse({"ok": True}, status=200)
     return JsonResponse({"ok": False}, status=401)
+@login_required
+def vendas_periodo(request):
+    return relatorios(request)
