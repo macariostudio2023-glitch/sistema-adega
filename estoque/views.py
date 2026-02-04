@@ -236,8 +236,8 @@ def relatorios(request):
         "itens": itens,
         "resumo": resumo,
         "inicio_mes": inicio_mes,
-        "hoje": fim_mes,  # Agora passa o último dia do mês para o HTML
-        "nome_mes": nome_mes, # Nome do mês em português
+        "hoje": fim_mes,  
+        "nome_mes": nome_mes, 
     })
 
 # =========================
@@ -253,14 +253,28 @@ def estoque_baixo(request):
     return render(request, "estoque/estoque_baixo.html", {"form": form, "limite": limite, "produtos": produtos})
 
 # =========================
-# CONSULTA DE ESTOQUE
+# CONSULTA DE ESTOQUE (ATUALIZADO COM PREÇO DE VENDA)
 # =========================
 @login_required
 def consultar_estoque(request):
     adega = get_adega_atual(request)
     termo = request.GET.get("q", "").strip()
-    produtos = Produto.objects.filter(adega=adega).filter(Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)).order_by("nome")[:10]
-    dados = [{"nome": p.nome, "codigo": p.codigo_barras, "estoque": p.estoque_atual, "preco": str(_money(_to_decimal(p.preco_venda)))} for p in produtos]
+    
+    produtos = Produto.objects.filter(adega=adega).filter(
+        Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)
+    ).order_by("nome")[:10]
+    
+    # Adicionamos "preco_venda" explicitamente para o JavaScript ler
+    dados = [
+        {
+            "nome": p.nome, 
+            "codigo": p.codigo_barras, 
+            "estoque": p.estoque_atual, 
+            "preco": str(_money(_to_decimal(p.preco_venda))),
+            "preco_venda": str(_money(_to_decimal(p.preco_venda)))
+        } for p in produtos
+    ]
+    
     return JsonResponse(dados, safe=False)
 
 # =========================
