@@ -33,7 +33,6 @@
 
   <form method="post" id="form-venda">
     {% csrf_token %}
-
     <input type="hidden" name="codigo_barras" id="id_codigo_barras">
 
     <label>Quantidade</label>
@@ -44,13 +43,13 @@
         class="form-control" 
         required 
         min="1" 
-        placeholder="Digite a quantidade..."
+        placeholder="0"
         value="" 
         style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white;"
     >
 
-    <button type="button" id="btn-finalizar-venda" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: 800; background-color: #22c55e; color: white; border-radius: 8px;">
-      ✅ CONFIRMAR VENDA
+    <button type="submit" id="btn-confirmar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold;">
+      ✅ Confirmar Venda
     </button>
   </form>
 
@@ -62,7 +61,6 @@ const lista = document.getElementById("resultado-busca");
 const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 const formVenda = document.getElementById("form-venda");
-const btnFinalizar = document.getElementById("btn-finalizar-venda");
 
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
@@ -82,28 +80,15 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA DE OURO: Bloqueia qualquer tentativa de envio automático pelo Enter
-formVenda.onsubmit = (e) => { e.preventDefault(); return false; };
-
-// ✅ ENVIO MANUAL: A venda só é processada quando você CLICA no botão verde
-btnFinalizar.addEventListener("click", function() {
-  const qtd = parseInt(campoQtd.value) || 0;
-  const codigo = campoCodigoHidden.value;
-
-  if (!codigo) {
-    alert("Macario, bipe o produto primeiro!");
-    return;
+// 🛑 TRAVA DO ENTER: Corrigido para 'true' minúsculo
+window.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.target.nodeName !== 'TEXTAREA') {
+    if (e.target.id !== 'btn-confirmar') {
+        e.preventDefault();
+        return false;
+    }
   }
-
-  if (qtd <= 0) {
-    alert("Macario, informe a quantidade!");
-    campoQtd.focus();
-    return;
-  }
-
-  // Só aqui o formulário é enviado de verdade
-  formVenda.submit();
-});
+}, true); // <-- Era aqui o erro (estava True)
 
 let timerBusca = null;
 inputBusca.addEventListener("input", function(){
@@ -116,22 +101,16 @@ inputBusca.addEventListener("input", function(){
       .then(res => res.json())
       .then(dados => {
         lista.innerHTML = "";
-        
-        if(dados.length === 1 && (dados[0].codigo === termo)) {
+        if(dados.length === 1 && dados[0].codigo === termo) {
             selecionarProduto(dados[0]);
             inputBusca.value = ""; 
             return;
         }
-
         dados.forEach(p => {
           const li = document.createElement("li");
-          li.innerHTML = `<strong>${p.nome}</strong><br><small>R$ ${p.preco_venda}</small>`;
-          li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
-          li.onclick = () => {
-              selecionarProduto(p);
-              inputBusca.value = p.nome;
-              lista.innerHTML = "";
-          };
+          li.innerHTML = `<strong>${p.nome}</strong> - R$ ${p.preco_venda}`;
+          li.style = "padding:10px; border:1px solid #374151; cursor:pointer; background: #111827; margin-bottom:5px; border-radius:8px;";
+          li.onclick = () => selecionarProduto(p);
           lista.appendChild(li);
         });
       });
@@ -139,26 +118,20 @@ inputBusca.addEventListener("input", function(){
 });
 
 function selecionarProduto(p) {
-    precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
+    precoUnitarioAtual = parseFloat(String(p.preco_venda).replace(",", ".")) || 0;
     prevNome.innerText = p.nome;
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
     
-    // ✅ Limpa o campo de quantidade para não ter o "1"
+    // ✅ LIMPEZA: Garante que o campo fique vazio ao bipar
     campoQtd.value = ""; 
     recalcularTotal();
     
-    // Foca na quantidade para o vendedor digitar
     setTimeout(() => {
         campoQtd.focus();
     }, 200);
 }
 
 campoQtd.addEventListener("input", recalcularTotal);
-
-// Impede que o Enter no campo de busca envie o form
-inputBusca.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") e.preventDefault();
-});
 </script>
 {% endblock %}
