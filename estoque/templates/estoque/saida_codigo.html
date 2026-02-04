@@ -44,13 +44,13 @@
         class="form-control" 
         required 
         min="1" 
-        placeholder="Digite a quantidade..."
+        placeholder="0"
         value="" 
-        style="font-size: 20px; text-align: center;"
+        style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white; border: 1px solid #334155;"
     >
 
-    <button type="submit" id="btn-confirmar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold;">
-      ✅ Confirmar Venda
+    <button type="button" id="btn-finalizar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: 800; background-color: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer;">
+      ✅ CONFIRMAR VENDA
     </button>
   </form>
 
@@ -62,6 +62,7 @@ const lista = document.getElementById("resultado-busca");
 const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 const formVenda = document.getElementById("form-venda");
+const btnFinalizar = document.getElementById("btn-finalizar");
 
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
@@ -81,19 +82,28 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA 1: Impede o Enter de enviar o formulário
-formVenda.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault(); // Bloqueia o envio automático
-    return false;
-  }
-});
+// 🛑 TRAVA TOTAL: Impede que o formulário seja enviado por qualquer tecla (Enter do leitor)
+formVenda.onsubmit = (e) => { e.preventDefault(); return false; };
 
-// 🛑 TRAVA 2: Impede o Enter no campo de busca (leitor)
-inputBusca.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
+// ✅ ENVIO MANUAL: Só envia quando você clicar no botão verde
+btnFinalizar.addEventListener("click", function() {
+  const qtd = parseInt(campoQtd.value) || 0;
+  const codigo = campoCodigoHidden.value;
+
+  if (!codigo) {
+    alert("Macario, bipe ou selecione um produto primeiro!");
+    inputBusca.focus();
+    return;
   }
+
+  if (qtd <= 0) {
+    alert("Macario, a quantidade deve ser pelo menos 1!");
+    campoQtd.focus();
+    return;
+  }
+
+  // Se tudo estiver certo, envia o formulário
+  formVenda.submit();
 });
 
 let timerBusca = null;
@@ -107,18 +117,28 @@ inputBusca.addEventListener("input", function(){
       .then(res => res.json())
       .then(dados => {
         lista.innerHTML = "";
-        // Se o leitor achar o código exato
-        if(dados.length === 1 && dados[0].codigo === termo) {
+        
+        // Se for um BIP certeiro
+        if(dados.length === 1 && (dados[0].codigo === termo)) {
             selecionarProduto(dados[0]);
-            inputBusca.value = ""; // Limpa a busca para o próximo
+            inputBusca.value = ""; 
             return;
         }
-        // ... (resto da lógica de lista)
+
+        if(dados.length === 0){
+          prevErro.innerText = "Produto não encontrado.";
+          return;
+        }
+
         dados.forEach(p => {
           const li = document.createElement("li");
-          li.innerHTML = `<strong>${p.nome}</strong> - R$ ${p.preco_venda}`;
-          li.style = "padding:10px; border:1px solid #374151; cursor:pointer; background: #111827; margin-bottom:5px; border-radius:8px;";
-          li.onclick = () => selecionarProduto(p);
+          li.innerHTML = `<strong>${p.nome}</strong><br><small>R$ ${p.preco_venda}</small>`;
+          li.style = "padding:10px; border:1px solid #374151; border-radius:8px; margin-bottom:6px; cursor:pointer; background: #111827;";
+          li.onclick = () => {
+              selecionarProduto(p);
+              inputBusca.value = p.nome;
+              lista.innerHTML = "";
+          };
           lista.appendChild(li);
         });
       });
@@ -126,12 +146,12 @@ inputBusca.addEventListener("input", function(){
 });
 
 function selecionarProduto(p) {
-    precoUnitarioAtual = parseFloat(String(p.preco_venda).replace(",", ".")) || 0;
+    precoUnitarioAtual = parseFloat(String(p.preco_venda || p.preco).replace(",", ".")) || 0;
     prevNome.innerText = p.nome;
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
     
-    // ✅ LIMPEZA TOTAL: Garante que o campo nasça vazio e focado
+    // ✅ Limpa o campo e foca
     campoQtd.value = ""; 
     recalcularTotal();
     
@@ -141,5 +161,10 @@ function selecionarProduto(p) {
 }
 
 campoQtd.addEventListener("input", recalcularTotal);
+
+// Bloqueia o Enter no campo de busca para o leitor não dar "submit"
+inputBusca.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") e.preventDefault();
+});
 </script>
 {% endblock %}
