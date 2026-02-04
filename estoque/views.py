@@ -26,11 +26,14 @@ from .forms import (
 # HELPERS
 # =========================
 def _to_decimal(value) -> Decimal:
-    if value is None:
+    if value is None or value == "":
         return Decimal("0.00")
     if isinstance(value, Decimal):
         return value
-    return Decimal(str(value))
+    try:
+        return Decimal(str(value).replace(",", "."))
+    except:
+        return Decimal("0.00")
 
 def _money(value: Decimal) -> Decimal:
     return _to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -46,13 +49,14 @@ def _get_range_mes_atual():
     tz = timezone.get_current_timezone()
     hoje = timezone.localdate()
     inicio_mes = hoje.replace(day=1)
-    ultimo_dia = calendar.monthrange(hoje.year, hoye.month)[1]
+    
+    # CORREÇÃO: trocado 'hoye' por 'hoje'
+    ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
     fim_mes = hoje.replace(day=ultimo_dia)
     
     dt_inicio = timezone.make_aware(datetime.combine(inicio_mes, time.min), tz)
     dt_fim = timezone.make_aware(datetime.combine(fim_mes, time.max), tz)
     
-    # Nomes dos meses em português
     meses_pt = {
         1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
         5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
@@ -112,13 +116,12 @@ def entrada_codigo_barras(request):
     return render(request, "estoque/entrada_codigo.html", {"form": form})
 
 # =========================
-# SAÍDA POR CÓDIGO (ATUALIZADO PARA INICIAR COM QUANTIDADE 0)
+# SAÍDA POR CÓDIGO
 # =========================
 @login_required
 def saida_codigo_barras(request):
     adega = get_adega_atual(request)
     
-    # Forçamos o valor inicial do campo quantidade para 0
     if request.method == "POST":
         form = SaidaCodigoBarrasForm(request.POST)
     else:
@@ -132,7 +135,6 @@ def saida_codigo_barras(request):
         codigo = form.cleaned_data["codigo_barras"].strip()
         quantidade = form.cleaned_data["quantidade"]
 
-        # Garantia extra de que a venda não seja zero
         if quantidade <= 0:
             messages.error(request, "A quantidade deve ser maior que zero.")
             return render(request, "estoque/saida_codigo.html", {"form": form})
@@ -159,8 +161,6 @@ def saida_codigo_barras(request):
 
         valor_total = _money(_to_decimal(quantidade) * _to_decimal(produto.preco_venda))
         messages.success(request, f"✅ Venda registrada!\n{produto.nome}\nR$ {valor_total}")
-        
-        # Reinicia o formulário com quantidade 0 para a próxima venda
         form = SaidaCodigoBarrasForm(initial={'quantidade': 0})
 
     return render(request, "estoque/saida_codigo.html", {"form": form})
@@ -202,7 +202,7 @@ def novo_produto(request):
     return render(request, "estoque/novo_produto.html", {"form": form})
 
 # =========================
-# RELATÓRIOS
+# RELATÓRIOS (FIX ERRO 500)
 # =========================
 @login_required
 def relatorios(request):
@@ -265,7 +265,7 @@ def estoque_baixo(request):
     return render(request, "estoque/estoque_baixo.html", {"form": form, "limite": limite, "produtos": produtos})
 
 # =========================
-# CONSULTA DE ESTOQUE (FIX PREÇO DE VENDA)
+# CONSULTA DE ESTOQUE
 # =========================
 @login_required
 def consultar_estoque(request):
@@ -281,7 +281,6 @@ def consultar_estoque(request):
             "nome": p.nome, 
             "codigo": p.codigo_barras, 
             "estoque": p.estoque_atual, 
-            "preco": str(_money(_to_decimal(p.preco_venda))),
             "preco_venda": str(_money(_to_decimal(p.preco_venda)))
         } for p in produtos
     ]
