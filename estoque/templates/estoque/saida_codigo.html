@@ -48,7 +48,7 @@
         style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white;"
     >
 
-    <button type="submit" id="btn-confirmar" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold;">
+    <button type="button" id="btn-confirmar-venda" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold; background-color: #22c55e; color: white; border: none; border-radius: 8px;">
       ✅ Confirmar Venda
     </button>
   </form>
@@ -61,11 +61,11 @@ const lista = document.getElementById("resultado-busca");
 const campoCodigoHidden = document.getElementById("id_codigo_barras");
 const campoQtd = document.getElementById("id_quantidade");
 const formVenda = document.getElementById("form-venda");
+const btnConfirmar = document.getElementById("btn-confirmar-venda");
 
 const prevNome = document.getElementById("prev-nome");
 const prevUnit = document.getElementById("prev-unit");
 const prevTotal = document.getElementById("prev-total");
-const prevErro = document.getElementById("prev-erro");
 
 let precoUnitarioAtual = 0;
 
@@ -80,20 +80,31 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA DO ENTER: Corrigido para 'true' minúsculo
+// 🛑 TRAVA GLOBAL: Mata o Enter em qualquer lugar da página
 window.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && e.target.nodeName !== 'TEXTAREA') {
-    if (e.target.id !== 'btn-confirmar') {
-        e.preventDefault();
-        return false;
-    }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    return false;
   }
-}, true); // <-- Era aqui o erro (estava True)
+}, true);
+
+// 🚀 ENVIO CONTROLADO: Só envia se clicar no botão e tiver quantidade
+btnConfirmar.addEventListener("click", function() {
+    const qtd = parseInt(campoQtd.value) || 0;
+    if (qtd <= 0 || !campoCodigoHidden.value) {
+        alert("Macario, primeiro selecione o produto e digite a quantidade!");
+        return;
+    }
+    formVenda.submit(); 
+});
 
 let timerBusca = null;
 inputBusca.addEventListener("input", function(){
   const termo = inputBusca.value.trim();
-  if(termo.length < 2) return;
+  if(termo.length < 2) {
+      lista.innerHTML = "";
+      return;
+  }
 
   clearTimeout(timerBusca);
   timerBusca = setTimeout(() => {
@@ -101,6 +112,7 @@ inputBusca.addEventListener("input", function(){
       .then(res => res.json())
       .then(dados => {
         lista.innerHTML = "";
+        // Se o leitor achar o código exato
         if(dados.length === 1 && dados[0].codigo === termo) {
             selecionarProduto(dados[0]);
             inputBusca.value = ""; 
@@ -123,7 +135,7 @@ function selecionarProduto(p) {
     prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
     campoCodigoHidden.value = p.codigo;
     
-    // ✅ LIMPEZA: Garante que o campo fique vazio ao bipar
+    // Limpa e foca na quantidade
     campoQtd.value = ""; 
     recalcularTotal();
     
