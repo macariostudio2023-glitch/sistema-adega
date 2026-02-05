@@ -102,5 +102,6 @@ def novo_produto(request):
         "codigo": codigo_url, 
         "voltar": onde_voltar
     })
-
+def home(request): 
+    return redirect("entrada_codigo")
 # ... Resto das views (consultar_estoque, relatorios, etc) permanecem iguais
