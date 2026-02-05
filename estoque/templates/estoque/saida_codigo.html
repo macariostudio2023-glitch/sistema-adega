@@ -1,108 +1,74 @@
 {% extends "estoque/base.html" %}
 
-{% block title %}Saída / Venda{% endblock %}
-{% block page_wrapper_class %}center-screen{% endblock %}
+{% block title %}Saída/Venda - Sistema Adega{% endblock %}
 
 {% block content %}
-<div class="centered-card">
+<div class="centered-card" style="max-width: 500px; margin: 20px auto; padding: 20px; background: #111827; color: white; border-radius: 12px;">
 
-  <h2 style="text-align:center;">🧾 Saída / Venda</h2>
+  <h2 style="text-align:center; color: #ef4444;">🛒 Saída (Venda)</h2>
+  <p style="text-align:center; margin-top:6px; font-size: 0.9em; opacity: 0.8;">
+    {% if produto %} CONFIRME A QUANTIDADE {% else %} APONTE O LEITOR PARA VENDER {% endif %}
+  </p>
 
   {% if messages %}
     <ul style="list-style:none; padding:0; margin:12px 0;">
       {% for message in messages %}
-        <li style="margin-bottom:8px; padding:10px; border-radius:10px; font-weight:bold; text-align:center; background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %}; color: white;">
+        <li style="margin-bottom:8px; padding:10px; border-radius:10px; font-weight:bold; text-align:center; background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %};">
           {{ message }}
         </li>
       {% endfor %}
     </ul>
   {% endif %}
 
-  <label>Buscar produto (Nome ou Código de Barras)</label>
-  <input
-    type="text"
-    id="busca-produto"
-    placeholder="Bipe o código ou digite o nome..."
-    autocomplete="off"
-    style="margin-bottom: 5px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;"
-    autofocus
-  >
-
-  <ul id="resultado-busca" style="list-style:none; padding:0; margin-top:8px;"></ul>
-
-  <hr style="margin:20px 0; border-color: #374151;">
-
-  <div style="background:rgba(2,6,23,0.55); border:1px solid #1f2937; border-radius:12px; padding:14px; text-align:left; margin-bottom:16px;">
-    <div style="font-weight:800; margin-bottom:6px; color: #9ca3af;">PRÉVIA DA VENDA</div>
-    <div style="font-size: 1.1em;">Produto: <span id="prev-nome" style="font-weight:700; color: #60a5fa;">—</span></div>
-    <div>Preço unitário: <span id="prev-unit" style="font-weight:700;">R$ 0,00</span></div>
-    <div style="margin-top:8px; font-size:22px;">
-      Total: <span id="prev-total" style="font-weight:900; color:#4ade80;">R$ 0,00</span>
-    </div>
-    <div id="prev-erro" style="margin-top:8px; color:#fecaca; font-weight:700;"></div>
-  </div>
-
-  <form method="post" id="form-venda">
+  <form method="post" id="saidaForm">
     {% csrf_token %}
-    <input type="hidden" name="codigo_barras" id="id_codigo_barras">
-    <input type="hidden" name="acao" value="salvar"> <label>Quantidade</label>
-    <input 
-        type="number" 
-        name="quantidade" 
-        id="id_quantidade" 
-        class="form-control" 
-        required 
-        min="1" 
-        placeholder="0"
-        style="width: 100%; font-size: 28px; text-align: center; font-weight: bold; background: #0f172a; color: #4ade80; border: 2px solid #1e293b; border-radius: 12px; padding: 10px;"
-    >
 
-    <button type="button" id="btn-confirmar-venda" style="margin-top: 15px; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; background-color: #22c55e; color: white; border: none; border-radius: 12px; cursor: pointer; transition: 0.3s;">
-      ✅ Confirmar Venda
+    <label style="display:block; text-align:left; margin-bottom: 5px;">Código de barras</label>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" name="codigo_barras" id="id_codigo_barras" 
+               required autofocus 
+               value="{{ codigo|default:'' }}"
+               style="flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+        
+        <button type="submit" name="acao" value="buscar" style="width: 50px; background: #4b5563; border: none; border-radius: 8px; color: white; cursor: pointer;">🔎</button>
+    </div>
+
+    {% if produto %}
+    <div style="margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444;">
+        <h3 style="margin: 0; color: #f87171;">{{ produto.nome }}</h3>
+        <p style="margin: 5px 0; opacity: 0.8;">Estoque atual: <strong>{{ produto.estoque_atual }}</strong></p>
+        <p style="margin: 5px 0; color: #34d399;">Preço: <strong>R$ {{ produto.preco_venda }}</strong></p>
+        
+        <label style="text-align:left; margin-top: 10px; display: block;">Quantidade a vender</label>
+        <input type="number" name="quantidade" id="id_quantidade" value="1" min="1" max="{{ produto.estoque_atual }}"
+               style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+
+        <button type="submit" name="acao" value="salvar" 
+                style="margin-top: 15px; width: 100%; padding: 15px; font-size: 1.1em; background: #ef4444; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;">
+            🚀 CONFIRMAR VENDA
+        </button>
+        
+        <a href="{% url 'saida_codigo' %}" style="display:block; text-align:center; margin-top:10px; color:#9ca3af; text-decoration:none; font-size:0.9em;">Cancelar</a>
+    </div>
+    {% else %}
+    <button type="submit" name="acao" value="buscar" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #3b82f6; border: none; border-radius: 8px; color: white; cursor: pointer;">
+        BUSCAR PARA VENDA
     </button>
-    
-    <a href="{% url 'saida_codigo' %}" style="display:block; text-align:center; margin-top:15px; color:#9ca3af; text-decoration:none;">Limpar Tela</a>
+    {% endif %}
   </form>
 
 </div>
 
 <script>
-const inputBusca = document.getElementById("busca-produto");
-const lista = document.getElementById("resultado-busca");
-const campoCodigoHidden = document.getElementById("id_codigo_barras");
-const campoQtd = document.getElementById("id_quantidade");
-const formVenda = document.getElementById("form-venda");
-const btnConfirmar = document.getElementById("btn-confirmar-venda");
-
-const prevNome = document.getElementById("prev-nome");
-const prevUnit = document.getElementById("prev-unit");
-const prevTotal = document.getElementById("prev-total");
-
-let precoUnitarioAtual = 0;
-
-function dinheiroBR(valor){
-  const n = Number(valor) || 0;
-  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function recalcularTotal() {
-  const qtd = parseInt(campoQtd.value) || 0;
-  const total = precoUnitarioAtual * qtd;
-  prevTotal.innerText = "R$ " + dinheiroBR(total);
-}
-
-// 🛑 TRAVA GLOBAL: Impede o Enter de submeter o formulário sozinho
-window.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    // Se estiver na quantidade, o Enter confirma a venda
-    if (document.activeElement === campoQtd) {
-        confirmarVenda();
-    } else {
-        e.preventDefault();
+  window.onload = function () {
+    const campoCodigo = document.getElementById("id_codigo_barras");
+    const campoQuantidade = document.getElementById("id_quantidade");
+    if (campoQuantidade) {
+        campoQuantidade.focus();
+        campoQuantidade.select();
+    } else if (campoCodigo) {
+        campoCodigo.focus();
     }
-  }
-}, true);
-
-function confirmarVenda() {
-    const qtd = parseInt(campoQtd.value) || 0;
-    if (qtd <= 0 || !campoCodigoHidden.value) {
+  };
+</script>
+{% endblock %}
