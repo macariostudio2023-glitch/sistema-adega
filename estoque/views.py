@@ -26,18 +26,45 @@ def _to_decimal(value):
         return Decimal("0.00")
 
 def get_adega_atual(request):
-    adega, _ = Adega.objects.get_or_create(id=1, defaults={"nome": "Adega Principal"})
-    return adega
+    try:
+        # Pega a primeira adega ou cria uma se não existir nada
+        adega = Adega.objects.first()
+        if not adega:
+            adega = Adega.objects.create(nome="Adega Principal")
+        return adega
+    except Exception as e:
+        # Isso vai aparecer no seu log do Render se der erro
+        print(f"DEBUG: Erro fatal no banco ao buscar adega: {e}")
+        return None
 
-# =========================
-# OPERAÇÃO (ENTRADA E SAÍDA)
-# =========================
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
+    
+    # Se a adega falhar, não deixa dar erro 500, mostra uma mensagem
+    if not adega:
+        return HttpResponse("Erro de configuração no banco de dados. Verifique os Models.")
+
     produto = None
-    codigo = request.POST.get("codigo_barras", "").strip()
-    acao = request.POST.get("acao")
+    codigo = ""
+    
+    if request.method == "POST":
+        codigo = request.POST.get("codigo_barras", "").strip()
+        acao = request.POST.get("acao")
+        
+        if codigo:
+            try:
+                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+                if acao == "salvar":
+                    qtd_raw = request.POST.get("quantidade", "1").strip()
+                    quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
+                    Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
+                    messages.success(request, f"✅ Entrada: {produto.nome} (+{quantidade})")
+                    return redirect("entrada_codigo")
+            except Produto.DoesNotExist:
+                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
+    
+    return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
 
     if request.method == "POST" and codigo:
         try:
