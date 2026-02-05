@@ -64,11 +64,19 @@ def saida_codigo_barras(request):
             if acao == "salvar":
                 qtd_raw = request.POST.get("quantidade", "1").strip()
                 quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
+                
                 if produto.estoque_atual < quantidade:
                     messages.error(request, "❌ Estoque insuficiente!")
                 else:
+                    # Calcula o valor total da venda atual
+                    valor_total = produto.preco_venda * quantidade
+                    
+                    # Registra a saída
                     Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
-                    messages.success(request, f"✅ Venda: {produto.nome} (-{quantidade})")
+                    
+                    # AVISO TURBINADO: Agora mostra o valor para o vendedor
+                    messages.success(request, f"✅ Venda: {produto.nome} | Total: R$ {valor_total:.2f}")
+                    
                     return redirect("saida_codigo")
         except Produto.DoesNotExist:
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
