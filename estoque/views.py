@@ -41,13 +41,12 @@ def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
     produto = None
     codigo = request.POST.get("codigo_barras", "").strip()
-    acao = request.POST.get("acao") # Captura se é 'buscar' ou 'salvar'
+    acao = request.POST.get("acao")
 
     if request.method == "POST" and codigo:
         try:
             produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
             
-            # SÓ SALVA SE O USUÁRIO CLICOU NO BOTÃO DE SALVAR OU DEU ENTER NA QUANTIDADE
             if acao == "salvar":
                 qtd_raw = request.POST.get("quantidade", "1").strip()
                 quantidade = int(qtd_raw) if qtd_raw and qtd_raw.isdigit() else 1
@@ -58,13 +57,10 @@ def entrada_codigo_barras(request):
                 )
                 messages.success(request, f"✅ Estoque atualizado: {produto.nome} (+{quantidade})")
                 return redirect("entrada_codigo")
-            
-            # Se for apenas o bip inicial (acao != salvar), ele localiza o produto e exibe na tela
             else:
                 messages.info(request, f"Produto encontrado: {produto.nome}")
 
         except Produto.DoesNotExist:
-            # Se o produto não existe, manda cadastrar
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
     
     return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
@@ -107,6 +103,33 @@ def saida_codigo_barras(request):
     return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
 
 # =========================
+# CONSULTA AJAX (PARA AS BUSCAS EM TEMPO REAL)
+# =========================
+@login_required
+def consultar_estoque(request):
+    termo = request.GET.get('q', '').strip()
+    adega = get_adega_atual(request)
+    
+    if termo:
+        produtos = Produto.objects.filter(
+            Q(adega=adega) & 
+            (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo))
+        )[:10]
+    else:
+        produtos = []
+
+    dados = [
+        {
+            "id": p.id,
+            "nome": p.nome,
+            "codigo": p.codigo_barras,
+            "preco_venda": str(p.preco_venda),
+            "estoque": p.estoque_atual
+        } for p in produtos
+    ]
+    return JsonResponse(dados, safe=False)
+
+# =========================
 # CADASTRO E RELATÓRIOS
 # =========================
 @login_required
@@ -138,6 +161,14 @@ def relatorios(request):
     adega = get_adega_atual(request)
     itens = Movimentacao.objects.filter(adega=adega).exclude(tipo="ENTRADA").order_by("-data")[:50]
     return render(request, "estoque/relatorios.html", {"itens": itens})
+
+@login_required
+def vendas_hoje(request):
+    adega = get_adega_atual(request)
+    hoje = timezone.now().date()
+    vendas = Movimentacao.objects.filter(adega=adega, tipo="SAIDA", data__date=hoje).order_by("-data")
+    total_valor = sum(v.quantidade * v.produto.preco_venda for v in vendas)
+    return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total_valor, "hoje": hoje})
 
 @login_required
 def estoque_baixo(request):
@@ -174,22 +205,3 @@ def limpar_relatorio(request):
         Movimentacao.objects.filter(adega=get_adega_atual(request)).exclude(tipo="ENTRADA").delete()
         messages.success(request, "Relatório limpo!")
     return redirect("relatorios")
-
-@login_required
-def vendas_hoje(request):
-    adega = get_adega_atual(request)
-    hoje = timezone.now().date()
-    # Filtra movimentações do tipo SAIDA que aconteceram hoje
-    vendas = Movimentacao.objects.filter(
-        adega=adega, 
-        tipo="SAIDA", 
-        data__date=hoje
-    ).order_by("-data")
-    
-    total_valor = sum(v.quantidade * v.produto.preco_venda for v in vendas)
-    
-    return render(request, "estoque/vendas_hoje.html", {
-        "vendas": vendas,
-        "total_valor": total_valor,
-        "hoje": hoje
-    })
