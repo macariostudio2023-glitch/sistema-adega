@@ -1,82 +1,44 @@
 {% extends "estoque/base.html" %}
+
 {% block title %}Novo Produto - Sistema Adega{% endblock %}
 
 {% block content %}
+<div class="centered-card" style="max-width: 500px; margin: 20px auto; padding: 20px; background: #111827; color: white; border-radius: 12px;">
+    <h2 style="text-align:center;">🆕 Cadastrar Produto</h2>
+    
+    <form method="post" style="margin-top: 20px;">
+        {% csrf_token %}
 
-<style>
-  /* 🔒 correção de layout: cada campo em uma linha */
-  .field {
-    margin-bottom: 14px;
-  }
-  .field label {
-    display: block;
-    margin-bottom: 6px;
-  }
-  .field input,
-  .field select {
-    display: block;
-    width: 100%;
-  }
-</style>
+        <label style="display:block; margin-bottom:5px;">Código de Barras</label>
+        <input type="text" name="codigo_barras" value="{{ codigo }}" required
+               style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
-<h2>🆕 Cadastrar Produto</h2>
-<p>Esse código não existe ainda. Cadastre para continuar.</p>
+        <label style="display:block; margin-bottom:5px;">Nome do Produto</label>
+        <input type="text" name="nome" required autofocus
+               style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
-{% if messages %}
-  <ul class="messages">
-    {% for message in messages %}
-      <li class="msg {% if message.tags == 'error' %}msg-error{% endif %}{% if message.tags == 'success' %}msg-success{% endif %}">
-        {{ message }}
-      </li>
-    {% endfor %}
-  </ul>
-{% endif %}
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label style="display:block; margin-bottom:5px;">Preço Custo</label>
+                <input type="text" name="preco_custo" placeholder="0,00"
+                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+            </div>
+            <div style="flex: 1;">
+                <label style="display:block; margin-bottom:5px;">Preço Venda</label>
+                <input type="text" name="preco_venda" placeholder="0,00"
+                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+            </div>
+        </div>
 
-{% if form %}
-  <form method="post">
-    {% csrf_token %}
+        <label style="display:block; margin-bottom:5px;">Estoque Inicial</label>
+        <input type="number" name="estoque_atual" value="0"
+               style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
-    <div class="field">
-      <label>Código de barras</label>
-      {{ form.codigo_barras }}
-    </div>
-
-    <div class="field">
-      <label>Nome do produto</label>
-      {{ form.nome }}
-    </div>
-
-    <div class="field">
-      <label>Categoria</label>
-      {{ form.categoria }}
-    </div>
-
-    <!-- ✅ agora o custo fica sempre ABAIXO -->
-    <div class="field">
-      <label>Preço de custo</label>
-      {{ form.preco_custo }}
-    </div>
-
-    <div class="field">
-      <label>Preço de venda</label>
-      {{ form.preco_venda }}
-    </div>
-
-    <div class="field">
-      <label>Estoque inicial</label>
-      {{ form.estoque_inicial }}
-    </div>
-
-    <div class="actions">
-      <button class="confirm" type="submit">Salvar Produto</button>
-    </div>
-
-    <div class="hint">
-      Após salvar, você volta automaticamente para continuar a operação.
-    </div>
-  </form>
-{% else %}
-  <p>Não foi possível abrir o cadastro (faltou o código).</p>
-{% endif %}
-
+        <button type="submit" style="width: 100%; padding: 15px; background: #22c55e; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;">
+            💾 SALVAR PRODUTO
+        </button>
+        
+        <a href="{{ voltar }}" style="display:block; text-align:center; margin-top:15px; color:#9ca3af; text-decoration:none;">Voltar</a>
+    </form>
+</div>
 {% endblock %}

@@ -1,23 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
 import csv
-
-from django.db import transaction
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-
 from .models import Adega, Produto, Movimentacao, Categoria
 
-# =========================
-# HELPERS
-# =========================
+# Helpers
 def _to_decimal(value):
     if not value: return Decimal("0.00")
     try:
@@ -26,26 +20,18 @@ def _to_decimal(value):
         return Decimal("0.00")
 
 def get_adega_atual(request):
-    """Auto-setup: Se não existir adega, cria uma na hora."""
     try:
         adega = Adega.objects.first()
         if not adega:
             adega = Adega.objects.create(nome="Minha Adega")
         return adega
-    except Exception as e:
-        print(f"DEBUG: Erro no banco: {e}")
+    except:
         return None
 
-# =========================
-# VIEWS
-# =========================
-
+# Views Operacionais
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
-    if not adega:
-        return HttpResponse("Erro no Banco: Verifique se rodou as migrações no Build Command.")
-
     produto = None
     codigo = request.POST.get("codigo_barras", "").strip()
     acao = request.POST.get("acao")
@@ -57,10 +43,11 @@ def entrada_codigo_barras(request):
                 qtd_raw = request.POST.get("quantidade", "1").strip()
                 quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
                 Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
-                messages.success(request, f"✅ Estoque: {produto.nome} (+{quantidade})")
+                messages.success(request, f"✅ Entrada: {produto.nome} (+{quantidade})")
                 return redirect("entrada_codigo")
         except Produto.DoesNotExist:
-            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
+            # REDIRECIONAMENTO FIXO PARA NÃO ERRAR
+            return redirect(f"/novo-produto/?codigo={codigo}")
     
     return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
 
@@ -84,16 +71,16 @@ def saida_codigo_barras(request):
                     messages.success(request, f"✅ Venda: {produto.nome}")
                     return redirect("saida_codigo")
         except Produto.DoesNotExist:
-            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
-    
+            return redirect(f"/novo-produto/?codigo={codigo}")
+            
     return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
 
 @login_required
 def novo_produto(request):
     adega = get_adega_atual(request)
-    # Garante que temos uma categoria padrão
     categoria, _ = Categoria.objects.get_or_create(nome="Geral")
-    
+    codigo_url = request.GET.get("codigo", "")
+
     if request.method == "POST":
         Produto.objects.create(
             adega=adega,
@@ -104,16 +91,17 @@ def novo_produto(request):
             preco_venda=_to_decimal(request.POST.get("preco_venda")),
             estoque_atual=int(request.POST.get("estoque_atual") or 0)
         )
-        voltar = request.GET.get('voltar', '/entrada-codigo/')
-        return redirect(voltar)
-    return render(request, "estoque/novo_produto.html", {"codigo": request.GET.get("codigo", "")})
+        return redirect("entrada_codigo")
 
+    return render(request, "estoque/novo_produto.html", {"codigo": codigo_url})
+
+# Outras Views (Relatórios, etc)
 @login_required
 def consultar_estoque(request):
     termo = request.GET.get('q', '').strip()
     adega = get_adega_atual(request)
     produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
-    dados = [{"id": p.id, "nome": p.nome, "codigo": p.codigo_barras, "preco_venda": str(p.preco_venda), "estoque": p.estoque_atual} for p in produtos]
+    dados = [{"nome": p.nome, "estoque": p.estoque_atual} for p in produtos]
     return JsonResponse(dados, safe=False)
 
 @login_required
@@ -147,8 +135,7 @@ def baixar_relatorio(request):
 
 @login_required
 def limpar_relatorio(request):
-    if request.session.get("admin_gate_ok"):
-        Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
+    Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
     return redirect("relatorios")
 
 @csrf_exempt
