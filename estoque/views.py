@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from .models import Adega, Produto, Movimentacao, Categoria
 
 # =========================
-# HELPERS (UTILITÁRIOS)
+# HELPERS
 # =========================
 def _to_decimal(value):
     if not value: return Decimal("0.00")
@@ -26,119 +26,100 @@ def _to_decimal(value):
         return Decimal("0.00")
 
 def get_adega_atual(request):
-    """Busca a primeira adega ou cria uma para evitar erro de banco vazio."""
+    """Auto-setup: Se não existir adega, cria uma na hora."""
     try:
         adega = Adega.objects.first()
         if not adega:
             adega = Adega.objects.create(nome="Minha Adega")
         return adega
     except Exception as e:
-        print(f"Erro ao buscar adega: {e}")
+        print(f"DEBUG: Erro no banco: {e}")
         return None
 
 # =========================
-# VIEWS PRINCIPAIS
+# VIEWS
 # =========================
 
 @login_required
 def entrada_codigo_barras(request):
-    try:
-        adega = get_adega_atual(request)
-        if not adega:
-            return HttpResponse("Erro: Não foi possível encontrar ou criar uma Adega no banco de dados.")
+    adega = get_adega_atual(request)
+    if not adega:
+        return HttpResponse("Erro no Banco: Verifique se rodou as migrações no Build Command.")
 
-        produto = None
-        codigo = request.POST.get("codigo_barras", "").strip()
-        acao = request.POST.get("acao")
+    produto = None
+    codigo = request.POST.get("codigo_barras", "").strip()
+    acao = request.POST.get("acao")
 
-        if request.method == "POST" and codigo:
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
-                if acao == "salvar":
-                    qtd_raw = request.POST.get("quantidade", "1").strip()
-                    quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
-                    Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
-                    messages.success(request, f"✅ Entrada: {produto.nome} (+{quantidade})")
-                    return redirect("entrada_codigo")
-            except Produto.DoesNotExist:
-                # Se não achar o produto, manda cadastrar
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
-        
-        return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
-    except Exception as e:
-        return HttpResponse(f"Erro na Entrada: {e}")
+    if request.method == "POST" and codigo:
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+            if acao == "salvar":
+                qtd_raw = request.POST.get("quantidade", "1").strip()
+                quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
+                Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
+                messages.success(request, f"✅ Estoque: {produto.nome} (+{quantidade})")
+                return redirect("entrada_codigo")
+        except Produto.DoesNotExist:
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
+    
+    return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
 
 @login_required
 def saida_codigo_barras(request):
-    try:
-        adega = get_adega_atual(request)
-        produto = None
-        codigo = request.POST.get("codigo_barras", "").strip()
-        acao = request.POST.get("acao")
+    adega = get_adega_atual(request)
+    produto = None
+    codigo = request.POST.get("codigo_barras", "").strip()
+    acao = request.POST.get("acao")
 
-        if request.method == "POST" and codigo:
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
-                if acao == "salvar":
-                    qtd_raw = request.POST.get("quantidade", "1").strip()
-                    quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
-                    if produto.estoque_atual < quantidade:
-                        messages.error(request, "❌ Estoque insuficiente!")
-                    else:
-                        Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
-                        messages.success(request, f"✅ Venda: {produto.nome}")
-                        return redirect("saida_codigo")
-            except Produto.DoesNotExist:
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
-        
-        return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
-    except Exception as e:
-        return HttpResponse(f"Erro na Saída: {e}")
+    if request.method == "POST" and codigo:
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+            if acao == "salvar":
+                qtd_raw = request.POST.get("quantidade", "1").strip()
+                quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
+                if produto.estoque_atual < quantidade:
+                    messages.error(request, "❌ Estoque insuficiente!")
+                else:
+                    Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
+                    messages.success(request, f"✅ Venda: {produto.nome}")
+                    return redirect("saida_codigo")
+        except Produto.DoesNotExist:
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
+    
+    return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
 
 @login_required
 def novo_produto(request):
-    try:
-        adega = get_adega_atual(request)
-        categoria, _ = Categoria.objects.get_or_create(nome="Geral")
-        
-        if request.method == "POST":
-            Produto.objects.create(
-                adega=adega,
-                nome=request.POST.get("nome"),
-                categoria=categoria,
-                codigo_barras=request.POST.get("codigo_barras"),
-                preco_custo=_to_decimal(request.POST.get("preco_custo")),
-                preco_venda=_to_decimal(request.POST.get("preco_venda")),
-                estoque_atual=int(request.POST.get("estoque_atual") or 0)
-            )
-            voltar = request.GET.get('voltar', '/entrada-codigo/')
-            return redirect(voltar)
-        return render(request, "estoque/novo_produto.html", {"codigo": request.GET.get("codigo", "")})
-    except Exception as e:
-        return HttpResponse(f"Erro ao cadastrar produto: {e}")
-
-# =========================
-# RELATÓRIOS E CONSULTAS
-# =========================
+    adega = get_adega_atual(request)
+    # Garante que temos uma categoria padrão
+    categoria, _ = Categoria.objects.get_or_create(nome="Geral")
+    
+    if request.method == "POST":
+        Produto.objects.create(
+            adega=adega,
+            nome=request.POST.get("nome"),
+            categoria=categoria,
+            codigo_barras=request.POST.get("codigo_barras"),
+            preco_custo=_to_decimal(request.POST.get("preco_custo")),
+            preco_venda=_to_decimal(request.POST.get("preco_venda")),
+            estoque_atual=int(request.POST.get("estoque_atual") or 0)
+        )
+        voltar = request.GET.get('voltar', '/entrada-codigo/')
+        return redirect(voltar)
+    return render(request, "estoque/novo_produto.html", {"codigo": request.GET.get("codigo", "")})
 
 @login_required
 def consultar_estoque(request):
-    try:
-        termo = request.GET.get('q', '').strip()
-        adega = get_adega_atual(request)
-        produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
-        dados = [{"id": p.id, "nome": p.nome, "codigo": p.codigo_barras, "preco_venda": str(p.preco_venda), "estoque": p.estoque_atual} for p in produtos]
-        return JsonResponse(dados, safe=False)
-    except:
-        return JsonResponse([], safe=False)
+    termo = request.GET.get('q', '').strip()
+    adega = get_adega_atual(request)
+    produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
+    dados = [{"id": p.id, "nome": p.nome, "codigo": p.codigo_barras, "preco_venda": str(p.preco_venda), "estoque": p.estoque_atual} for p in produtos]
+    return JsonResponse(dados, safe=False)
 
 @login_required
 def relatorios(request):
-    try:
-        movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:50]
-        return render(request, "estoque/relatorios.html", {"itens": movs})
-    except Exception as e:
-        return HttpResponse(f"Erro no Relatório: {e}")
+    movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:50]
+    return render(request, "estoque/relatorios.html", {"itens": movs})
 
 @login_required
 def estoque_baixo(request):
@@ -147,12 +128,9 @@ def estoque_baixo(request):
 
 @login_required
 def vendas_hoje(request):
-    try:
-        vendas = Movimentacao.objects.filter(adega=get_adega_atual(request), tipo="SAIDA", data__date=timezone.now().date())
-        total = sum(v.quantidade * v.produto.preco_venda for v in vendas)
-        return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total})
-    except Exception as e:
-        return HttpResponse(f"Erro em Vendas Hoje: {e}")
+    vendas = Movimentacao.objects.filter(adega=get_adega_atual(request), tipo="SAIDA", data__date=timezone.now().date())
+    total = sum(v.quantidade * v.produto.preco_venda for v in vendas)
+    return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total})
 
 @login_required
 def vendas_periodo(request): return redirect("vendas_hoje")

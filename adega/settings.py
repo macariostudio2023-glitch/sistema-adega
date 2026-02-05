@@ -63,12 +63,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'adega.wsgi.application'
 
 # BANCO DE DADOS (Postgres no Render / SQLite Local)
+# =========================
+# DATABASE (FORÇANDO SQLITE PARA ENTREGA)
+# =========================
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
+
 
 # Validação de Senhas
 AUTH_PASSWORD_VALIDATORS = [

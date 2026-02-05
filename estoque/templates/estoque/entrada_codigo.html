@@ -4,7 +4,7 @@
 {% block page_wrapper_class %}center-screen{% endblock %}
 
 {% block content %}
-<div class="centered-card">
+<div class="centered-card" style="max-width: 500px; margin: 0 auto;">
 
   <h2 style="text-align:center;">📦 Entrada de Estoque</h2>
   <p style="text-align:center; margin-top:6px; font-size: 0.9em; opacity: 0.8;">
@@ -24,14 +24,14 @@
   <form method="post" id="entradaForm">
     {% csrf_token %}
 
-    <label style="text-align:left;">Código de barras</label>
+    <label style="display:block; text-align:left; margin-bottom: 5px;">Código de barras</label>
     <div style="display: flex; gap: 5px;">
         <input type="text" name="codigo_barras" id="id_codigo_barras" 
-               inputmode="none" required autofocus 
-               value="{{ codigo }}"
+               required autofocus 
+               value="{{ codigo|default:'' }}"
                style="flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
         
-        <button type="submit" name="acao" value="buscar" id="btn-buscar-hidden" style="width: 50px; background: #4b5563; padding: 0;">🔎</button>
+        <button type="submit" name="acao" value="buscar" style="width: 50px; background: #4b5563; border: none; border-radius: 8px; color: white; cursor: pointer;">🔎</button>
     </div>
 
     {% if produto %}
@@ -56,43 +56,49 @@
     </button>
     {% endif %}
 
-    <div class="hint" style="text-align:center; margin-top: 15px;">
+    <div class="hint" style="text-align:center; margin-top: 15px; font-size: 0.8em; opacity: 0.6;">
       Bipou → Localiza | Confirmar → Entra no estoque
     </div>
   </form>
 
   <hr style="margin:26px 0; border-color:#1f2937; opacity:.6;">
 
-  <h3 id="titulo-consulta" style="text-align:center; margin:0 0 10px 0;">
-    🔎 Consultar no estoque
-  </h3>
-
-  <input
-    type="text"
-    id="busca-produto"
-    placeholder="Digite nome ou código..."
-    style="margin-bottom:10px; text-align:center; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;"
-  >
+  <h3 style="text-align:center; margin:0 0 10px 0;">🔎 Consultar no estoque</h3>
+  <input type="text" id="busca-produto" placeholder="Digite nome ou código..."
+    style="margin-bottom:10px; text-align:center; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
   <div id="resultado-estoque"></div>
-
 </div>
 
 <script>
-  const campoCodigo = document.getElementById("id_codigo_barras");
-  const campoQuantidade = document.getElementById("id_quantidade");
-  const campoBusca = document.getElementById("busca-produto");
-  const resultado = document.getElementById("resultado-estoque");
-
   window.onload = function () {
-    // Se o campo de quantidade existir (produto encontrado), foca nele
+    const campoCodigo = document.getElementById("id_codigo_barras");
+    const campoQuantidade = document.getElementById("id_quantidade");
     if (campoQuantidade) {
         campoQuantidade.focus();
-        campoQuantidade.select(); // Deixa o '1' selecionado para facilitar
+        campoQuantidade.select();
     } else if (campoCodigo) {
         campoCodigo.focus();
     }
   };
 
-  // Se o usuário apertar Enter no código de barras e o produto já estiver na tela,
-  // fazemos
+  // Lógica de busca rápida (opcional)
+  const campoBusca = document.getElementById("busca-produto");
+  if (campoBusca) {
+    campoBusca.addEventListener("input", function() {
+      const q = this.value;
+      if (q.length > 2) {
+        fetch(`/consultar-estoque/?q=${q}`)
+          .then(r => r.json())
+          .then(data => {
+            let html = "";
+            data.forEach(p => {
+              html += `<div style="padding:8px; border-bottom:1px solid #374151;">${p.nome} - Qtd: ${p.estoque}</div>`;
+            });
+            document.getElementById("resultado-estoque").innerHTML = html;
+          });
+      }
+    });
+  }
+</script>
+{% endblock %}
