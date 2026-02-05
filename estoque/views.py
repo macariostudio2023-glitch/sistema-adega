@@ -174,3 +174,22 @@ def limpar_relatorio(request):
         Movimentacao.objects.filter(adega=get_adega_atual(request)).exclude(tipo="ENTRADA").delete()
         messages.success(request, "Relatório limpo!")
     return redirect("relatorios")
+
+@login_required
+def vendas_hoje(request):
+    adega = get_adega_atual(request)
+    hoje = timezone.now().date()
+    # Filtra movimentações do tipo SAIDA que aconteceram hoje
+    vendas = Movimentacao.objects.filter(
+        adega=adega, 
+        tipo="SAIDA", 
+        data__date=hoje
+    ).order_by("-data")
+    
+    total_valor = sum(v.quantidade * v.produto.preco_venda for v in vendas)
+    
+    return render(request, "estoque/vendas_hoje.html", {
+        "vendas": vendas,
+        "total_valor": total_valor,
+        "hoje": hoje
+    })
