@@ -104,4 +104,22 @@ def novo_produto(request):
     })
 def home(request): 
     return redirect("entrada_codigo")
+
+# --- COLE ISSO NO FINAL DO SEU estoque/views.py ---
+
+@login_required
+def consultar_estoque(request):
+    termo = request.GET.get('q', '').strip()
+    adega = get_adega_atual(request)
+    # Busca por nome ou código de barras
+    produtos = Produto.objects.filter(
+        Q(adega=adega) & 
+        (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo))
+    )[:10]
+    
+    dados = [{"nome": p.nome, "estoque": p.estoque_atual} for p in produtos]
+    return JsonResponse(dados, safe=False)
+
+def home(request):
+    return redirect("entrada_codigo")
 # ... Resto das views (consultar_estoque, relatorios, etc) permanecem iguais
