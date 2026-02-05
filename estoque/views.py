@@ -11,7 +11,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from .models import Adega, Produto, Movimentacao, Categoria
 
-# Helpers
+# --- HELPERS ---
 def _to_decimal(value):
     if not value: return Decimal("0.00")
     try:
@@ -28,7 +28,7 @@ def get_adega_atual(request):
     except:
         return None
 
-# Views Operacionais
+# --- OPERAÇÕES ---
 @login_required
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
@@ -43,10 +43,10 @@ def entrada_codigo_barras(request):
                 qtd_raw = request.POST.get("quantidade", "1").strip()
                 quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
                 Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
+                # O AVISO VERDE AQUI:
                 messages.success(request, f"✅ Entrada: {produto.nome} (+{quantidade})")
                 return redirect("entrada_codigo")
         except Produto.DoesNotExist:
-            # Informa que deve voltar para entrada
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
     
     return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
@@ -68,10 +68,9 @@ def saida_codigo_barras(request):
                     messages.error(request, "❌ Estoque insuficiente!")
                 else:
                     Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
-                    messages.success(request, f"✅ Venda: {produto.nome}")
+                    messages.success(request, f"✅ Venda: {produto.nome} (-{quantidade})")
                     return redirect("saida_codigo")
         except Produto.DoesNotExist:
-            # Informa que deve voltar para SAÍDA
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
             
     return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
@@ -80,9 +79,7 @@ def saida_codigo_barras(request):
 def novo_produto(request):
     adega = get_adega_atual(request)
     categoria, _ = Categoria.objects.get_or_create(nome="Geral")
-    
     codigo_url = request.GET.get("codigo", "")
-    # Pega o destino de volta da URL. Se não houver, o padrão é entrada.
     onde_voltar = request.GET.get("voltar", "/entrada-codigo/")
 
     if request.method == "POST":
@@ -95,35 +92,19 @@ def novo_produto(request):
             preco_venda=_to_decimal(request.POST.get("preco_venda")),
             estoque_atual=int(request.POST.get("estoque_atual") or 0)
         )
-        # Redireciona para onde o usuário estava antes
+        messages.success(request, "✅ Produto cadastrado com sucesso!")
         return redirect(onde_voltar)
 
-    return render(request, "estoque/novo_produto.html", {
-        "codigo": codigo_url, 
-        "voltar": onde_voltar
-    })
-def home(request): 
-    return redirect("entrada_codigo")
+    return render(request, "estoque/novo_produto.html", {"codigo": codigo_url, "voltar": onde_voltar})
 
-# --- COLE ISSO NO FINAL DO SEU estoque/views.py ---
-
+# --- CONSULTAS E RELATÓRIOS ---
 @login_required
 def consultar_estoque(request):
     termo = request.GET.get('q', '').strip()
     adega = get_adega_atual(request)
-    # Busca por nome ou código de barras
-    produtos = Produto.objects.filter(
-        Q(adega=adega) & 
-        (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo))
-    )[:10]
-    
+    produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
     dados = [{"nome": p.nome, "estoque": p.estoque_atual} for p in produtos]
     return JsonResponse(dados, safe=False)
-
-def home(request):
-    return redirect("entrada_codigo")
-
-# --- COLE ISSO NO FINAL DO SEU estoque/views.py ---
 
 @login_required
 def relatorios(request):
@@ -142,10 +123,6 @@ def vendas_hoje(request):
     return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total})
 
 @login_required
-def vendas_periodo(request):
-    return redirect("vendas_hoje")
-
-@login_required
 def baixar_relatorio(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="estoque.csv"'
@@ -159,14 +136,6 @@ def baixar_relatorio(request):
 def limpar_relatorio(request):
     Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
     return redirect("relatorios")
-
-@login_required
-def consultar_estoque(request):
-    termo = request.GET.get('q', '').strip()
-    adega = get_adega_atual(request)
-    produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
-    dados = [{"nome": p.nome, "estoque": p.estoque_atual} for p in produtos]
-    return JsonResponse(dados, safe=False)
 
 @csrf_exempt
 def admin_gate_check(request):
