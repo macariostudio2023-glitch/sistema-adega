@@ -146,3 +146,33 @@ def admin_gate_check(request):
 
 def home(request):
     return redirect("entrada_codigo")
+
+# --- ADICIONE ISSO NO FINAL DO SEU views.py ---
+
+@login_required
+def vendas_periodo(request):
+    # Por enquanto, redireciona para as vendas de hoje
+    return redirect("vendas_hoje")
+
+@login_required
+def baixar_relatorio(request):
+    import csv
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="estoque.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Produto', 'Tipo', 'Qtd', 'Data'])
+    for m in Movimentacao.objects.filter(adega=get_adega_atual(request)):
+        writer.writerow([m.produto.nome, m.tipo, m.quantidade, m.data])
+    return response
+
+@login_required
+def limpar_relatorio(request):
+    Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
+    return redirect("relatorios")
+
+@csrf_exempt
+def admin_gate_check(request):
+    if request.method == "POST" and request.POST.get("senha") == settings.ADMIN_GATE_PASSWORD:
+        request.session["admin_gate_ok"] = True
+        return JsonResponse({"ok": True})
+    return JsonResponse({"ok": False}, status=401)
