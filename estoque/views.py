@@ -122,4 +122,58 @@ def consultar_estoque(request):
 
 def home(request):
     return redirect("entrada_codigo")
-# ... Resto das views (consultar_estoque, relatorios, etc) permanecem iguais
+
+# --- COLE ISSO NO FINAL DO SEU estoque/views.py ---
+
+@login_required
+def relatorios(request):
+    movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:50]
+    return render(request, "estoque/relatorios.html", {"itens": movs})
+
+@login_required
+def estoque_baixo(request):
+    produtos = Produto.objects.filter(adega=get_adega_atual(request), estoque_atual__lte=5)
+    return render(request, "estoque/estoque_baixo.html", {"produtos": produtos})
+
+@login_required
+def vendas_hoje(request):
+    vendas = Movimentacao.objects.filter(adega=get_adega_atual(request), tipo="SAIDA", data__date=timezone.now().date())
+    total = sum(v.quantidade * v.produto.preco_venda for v in vendas)
+    return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total})
+
+@login_required
+def vendas_periodo(request):
+    return redirect("vendas_hoje")
+
+@login_required
+def baixar_relatorio(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="estoque.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Produto', 'Tipo', 'Qtd', 'Data'])
+    for m in Movimentacao.objects.filter(adega=get_adega_atual(request)):
+        writer.writerow([m.produto.nome, m.tipo, m.quantidade, m.data])
+    return response
+
+@login_required
+def limpar_relatorio(request):
+    Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
+    return redirect("relatorios")
+
+@login_required
+def consultar_estoque(request):
+    termo = request.GET.get('q', '').strip()
+    adega = get_adega_atual(request)
+    produtos = Produto.objects.filter(Q(adega=adega) & (Q(nome__icontains=termo) | Q(codigo_barras__icontains=termo)))[:10]
+    dados = [{"nome": p.nome, "estoque": p.estoque_atual} for p in produtos]
+    return JsonResponse(dados, safe=False)
+
+@csrf_exempt
+def admin_gate_check(request):
+    if request.method == "POST" and request.POST.get("senha") == settings.ADMIN_GATE_PASSWORD:
+        request.session["admin_gate_ok"] = True
+        return JsonResponse({"ok": True})
+    return JsonResponse({"ok": False}, status=401)
+
+def home(request):
+    return redirect("entrada_codigo")
