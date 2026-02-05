@@ -31,7 +31,7 @@
                value="{{ codigo }}"
                style="flex-grow: 1; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
         
-        <button type="button" id="btn-consulta" style="width: 50px; background: #4b5563; padding: 0;">🔎</button>
+        <button type="submit" name="acao" value="buscar" id="btn-buscar-hidden" style="width: 50px; background: #4b5563; padding: 0;">🔎</button>
     </div>
 
     {% if produto %}
@@ -40,10 +40,10 @@
         <p style="margin: 5px 0; opacity: 0.8;">Estoque atual: <strong>{{ produto.estoque_atual }}</strong></p>
         
         <label style="text-align:left; margin-top: 10px; display: block;">Quantidade a adicionar</label>
-        <input type="number" name="quantidade" value="1" min="1"
+        <input type="number" name="quantidade" id="id_quantidade" value="1" min="1"
                style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
 
-        <button type="submit" name="confirmar" value="true" 
+        <button type="submit" name="acao" value="salvar" 
                 style="margin-top: 15px; width: 100%; padding: 15px; font-size: 1.1em; background: #22c55e; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;">
             ✅ CONFIRMAR ENTRADA
         </button>
@@ -51,7 +51,7 @@
         <a href="{% url 'entrada_codigo' %}" style="display:block; text-align:center; margin-top:10px; color:#9ca3af; text-decoration:none; font-size:0.9em;">Cancelar</a>
     </div>
     {% else %}
-    <button type="submit" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #2563eb; border: none; border-radius: 8px; color: white; cursor: pointer;">
+    <button type="submit" name="acao" value="buscar" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #2563eb; border: none; border-radius: 8px; color: white; cursor: pointer;">
         BUSCAR PRODUTO
     </button>
     {% endif %}
@@ -80,58 +80,19 @@
 
 <script>
   const campoCodigo = document.getElementById("id_codigo_barras");
+  const campoQuantidade = document.getElementById("id_quantidade");
   const campoBusca = document.getElementById("busca-produto");
-  const btnConsulta = document.getElementById("btn-consulta");
   const resultado = document.getElementById("resultado-estoque");
 
   window.onload = function () {
-    if (campoCodigo) {
+    // Se o campo de quantidade existir (produto encontrado), foca nele
+    if (campoQuantidade) {
+        campoQuantidade.focus();
+        campoQuantidade.select(); // Deixa o '1' selecionado para facilitar
+    } else if (campoCodigo) {
         campoCodigo.focus();
-        campoCodigo.inputMode = "none";
     }
   };
 
-  btnConsulta.addEventListener("click", function() {
-      campoBusca.focus();
-      campoBusca.scrollIntoView({behavior: "smooth"});
-  });
-
-  // Busca automática (Debounce)
-  let timer = null;
-  campoBusca.addEventListener("input", function () {
-    const termo = this.value.trim();
-    clearTimeout(timer);
-    timer = setTimeout(() => buscarEstoque(termo), 250);
-  });
-
-  function buscarEstoque(termo){
-    if (termo.length < 2) {
-      resultado.innerHTML = "";
-      return;
-    }
-    fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
-      .then(res => res.json())
-      .then(dados => {
-        if (!dados || dados.length === 0) {
-          resultado.innerHTML = `<div style="padding:12px; border-radius:12px; text-align:center; background:rgba(239,68,68,.15);">Não encontrado.</div>`;
-          return;
-        }
-        let html = "<ul style='list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;'>";
-        dados.forEach(p => {
-          html += `
-            <li onclick="selecionarProduto('${p.codigo}')" style="cursor:pointer; padding:12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); text-align:center;">
-              <div style="font-weight:bold;">${p.nome}</div>
-              <div style="font-weight:bold; color:#a7f3d0;">Estoque: ${p.estoque}</div>
-            </li>`;
-        });
-        html += "</ul>";
-        resultado.innerHTML = html;
-      });
-  }
-
-  function selecionarProduto(codigo){
-    campoCodigo.value = codigo;
-    document.getElementById("entradaForm").submit();
-  }
-</script>
-{% endblock %}
+  // Se o usuário apertar Enter no código de barras e o produto já estiver na tela,
+  // fazemos

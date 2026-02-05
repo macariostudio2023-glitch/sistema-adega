@@ -40,35 +40,32 @@ def get_adega_atual(request):
 def entrada_codigo_barras(request):
     adega = get_adega_atual(request)
     produto = None
-    codigo = ""
+    codigo = request.POST.get("codigo_barras", "").strip()
+    acao = request.POST.get("acao") # Captura se é 'buscar' ou 'salvar'
 
-    if request.method == "POST":
-        codigo = request.POST.get("codigo_barras", "").strip()
-        confirmar = request.POST.get("confirmar") # Verifica se clicou no botão verde
-
-        if codigo:
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+    if request.method == "POST" and codigo:
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+            
+            # SÓ SALVA SE O USUÁRIO CLICOU NO BOTÃO DE SALVAR OU DEU ENTER NA QUANTIDADE
+            if acao == "salvar":
+                qtd_raw = request.POST.get("quantidade", "1").strip()
+                quantidade = int(qtd_raw) if qtd_raw and qtd_raw.isdigit() else 1
                 
-                # SÓ SALVA SE O USUÁRIO CLICOU EM CONFIRMAR (BOTÃO)
-                if confirmar:
-                    qtd_raw = request.POST.get("quantidade", "1").strip()
-                    quantidade = int(qtd_raw) if qtd_raw and qtd_raw.isdigit() else 1
-                    
-                    Movimentacao.objects.create(
-                        adega=adega, produto=produto, tipo="ENTRADA",
-                        quantidade=quantidade, data=timezone.now()
-                    )
-                    messages.success(request, f"✅ Estoque atualizado: {produto.nome} (+{quantidade})")
-                    return redirect("entrada_codigo")
-                
-                # Se apenas bipou, ele localiza o produto e exibe na tela para conferir
-                else:
-                    messages.info(request, f"Produto encontrado: {produto.nome}")
+                Movimentacao.objects.create(
+                    adega=adega, produto=produto, tipo="ENTRADA",
+                    quantidade=quantidade, data=timezone.now()
+                )
+                messages.success(request, f"✅ Estoque atualizado: {produto.nome} (+{quantidade})")
+                return redirect("entrada_codigo")
+            
+            # Se for apenas o bip inicial (acao != salvar), ele localiza o produto e exibe na tela
+            else:
+                messages.info(request, f"Produto encontrado: {produto.nome}")
 
-            except Produto.DoesNotExist:
-                # Se o produto não existe, manda cadastrar
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
+        except Produto.DoesNotExist:
+            # Se o produto não existe, manda cadastrar
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
     
     return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
 
@@ -78,28 +75,36 @@ def entrada_codigo_barras(request):
 @login_required
 def saida_codigo_barras(request):
     adega = get_adega_atual(request)
-    if request.method == "POST":
-        codigo = request.POST.get("codigo_barras", "").strip()
-        qtd_raw = request.POST.get("quantidade", "").strip()
-        quantidade = int(qtd_raw) if qtd_raw and qtd_raw.isdigit() else 1
+    produto = None
+    codigo = request.POST.get("codigo_barras", "").strip()
+    acao = request.POST.get("acao")
 
-        if codigo:
-            try:
-                produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+    if request.method == "POST" and codigo:
+        try:
+            produto = Produto.objects.get(adega=adega, codigo_barras=codigo)
+            
+            if acao == "salvar":
+                qtd_raw = request.POST.get("quantidade", "1").strip()
+                quantidade = int(qtd_raw) if qtd_raw and qtd_raw.isdigit() else 1
+
                 with transaction.atomic():
                     produto.refresh_from_db()
                     if produto.estoque_atual < quantidade:
-                        messages.error(request, f"❌ Estoque insuficiente: {produto.estoque_atual}")
+                        messages.error(request, f"❌ Estoque insuficiente! Atual: {produto.estoque_atual}")
                     else:
                         Movimentacao.objects.create(
                             adega=adega, produto=produto, tipo="SAIDA",
                             quantidade=quantidade, data=timezone.now()
                         )
-                        messages.success(request, f"✅ Venda realizada: {produto.nome}")
-                return redirect("saida_codigo")
-            except Produto.DoesNotExist:
-                return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
-    return render(request, "estoque/saida_codigo.html")
+                        messages.success(request, f"✅ Venda realizada: {produto.nome} (-{quantidade})")
+                        return redirect("saida_codigo")
+            else:
+                messages.info(request, f"Produto: {produto.nome} | Estoque: {produto.estoque_atual}")
+
+        except Produto.DoesNotExist:
+            return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
+            
+    return render(request, "estoque/saida_codigo.html", {"produto": produto, "codigo": codigo})
 
 # =========================
 # CADASTRO E RELATÓRIOS
@@ -148,7 +153,7 @@ def home(request):
     return redirect("entrada_codigo")
 
 # =========================
-# ADMIN GATE
+# ADMIN GATE (SISTEMA DE SEGURANÇA)
 # =========================
 @csrf_exempt
 @require_POST

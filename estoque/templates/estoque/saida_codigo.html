@@ -6,7 +6,17 @@
 {% block content %}
 <div class="centered-card">
 
-  <h2>🧾 Saída / Venda</h2>
+  <h2 style="text-align:center;">🧾 Saída / Venda</h2>
+
+  {% if messages %}
+    <ul style="list-style:none; padding:0; margin:12px 0;">
+      {% for message in messages %}
+        <li style="margin-bottom:8px; padding:10px; border-radius:10px; font-weight:bold; text-align:center; background:{% if message.tags == 'error' %}rgba(239,68,68,.25){% else %}rgba(34,197,94,.25){% endif %}; color: white;">
+          {{ message }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 
   <label>Buscar produto (Nome ou Código de Barras)</label>
   <input
@@ -14,18 +24,19 @@
     id="busca-produto"
     placeholder="Bipe o código ou digite o nome..."
     autocomplete="off"
-    style="margin-bottom: 5px;"
+    style="margin-bottom: 5px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;"
+    autofocus
   >
 
   <ul id="resultado-busca" style="list-style:none; padding:0; margin-top:8px;"></ul>
 
-  <hr style="margin:20px 0;">
+  <hr style="margin:20px 0; border-color: #374151;">
 
   <div style="background:rgba(2,6,23,0.55); border:1px solid #1f2937; border-radius:12px; padding:14px; text-align:left; margin-bottom:16px;">
-    <div style="font-weight:800; margin-bottom:6px;">Prévia da venda</div>
-    <div>Produto: <span id="prev-nome" style="font-weight:700;">—</span></div>
+    <div style="font-weight:800; margin-bottom:6px; color: #9ca3af;">PRÉVIA DA VENDA</div>
+    <div style="font-size: 1.1em;">Produto: <span id="prev-nome" style="font-weight:700; color: #60a5fa;">—</span></div>
     <div>Preço unitário: <span id="prev-unit" style="font-weight:700;">R$ 0,00</span></div>
-    <div style="margin-top:8px; font-size:18px;">
+    <div style="margin-top:8px; font-size:22px;">
       Total: <span id="prev-total" style="font-weight:900; color:#4ade80;">R$ 0,00</span>
     </div>
     <div id="prev-erro" style="margin-top:8px; color:#fecaca; font-weight:700;"></div>
@@ -34,8 +45,7 @@
   <form method="post" id="form-venda">
     {% csrf_token %}
     <input type="hidden" name="codigo_barras" id="id_codigo_barras">
-
-    <label>Quantidade</label>
+    <input type="hidden" name="acao" value="salvar"> <label>Quantidade</label>
     <input 
         type="number" 
         name="quantidade" 
@@ -44,13 +54,14 @@
         required 
         min="1" 
         placeholder="0"
-        value="" 
-        style="font-size: 24px; text-align: center; font-weight: bold; background: #0f172a; color: white;"
+        style="width: 100%; font-size: 28px; text-align: center; font-weight: bold; background: #0f172a; color: #4ade80; border: 2px solid #1e293b; border-radius: 12px; padding: 10px;"
     >
 
-    <button type="button" id="btn-confirmar-venda" style="margin-top: 15px; width: 100%; padding: 15px; font-weight: bold; background-color: #22c55e; color: white; border: none; border-radius: 8px;">
+    <button type="button" id="btn-confirmar-venda" style="margin-top: 15px; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; background-color: #22c55e; color: white; border: none; border-radius: 12px; cursor: pointer; transition: 0.3s;">
       ✅ Confirmar Venda
     </button>
+    
+    <a href="{% url 'saida_codigo' %}" style="display:block; text-align:center; margin-top:15px; color:#9ca3af; text-decoration:none;">Limpar Tela</a>
   </form>
 
 </div>
@@ -80,70 +91,18 @@ function recalcularTotal() {
   prevTotal.innerText = "R$ " + dinheiroBR(total);
 }
 
-// 🛑 TRAVA GLOBAL: Mata o Enter em qualquer lugar da página
+// 🛑 TRAVA GLOBAL: Impede o Enter de submeter o formulário sozinho
 window.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
-    e.preventDefault();
-    return false;
+    // Se estiver na quantidade, o Enter confirma a venda
+    if (document.activeElement === campoQtd) {
+        confirmarVenda();
+    } else {
+        e.preventDefault();
+    }
   }
 }, true);
 
-// 🚀 ENVIO CONTROLADO: Só envia se clicar no botão e tiver quantidade
-btnConfirmar.addEventListener("click", function() {
+function confirmarVenda() {
     const qtd = parseInt(campoQtd.value) || 0;
     if (qtd <= 0 || !campoCodigoHidden.value) {
-        alert("Macario, primeiro selecione o produto e digite a quantidade!");
-        return;
-    }
-    formVenda.submit(); 
-});
-
-let timerBusca = null;
-inputBusca.addEventListener("input", function(){
-  const termo = inputBusca.value.trim();
-  if(termo.length < 2) {
-      lista.innerHTML = "";
-      return;
-  }
-
-  clearTimeout(timerBusca);
-  timerBusca = setTimeout(() => {
-    fetch(`/consultar-estoque/?q=${encodeURIComponent(termo)}`)
-      .then(res => res.json())
-      .then(dados => {
-        lista.innerHTML = "";
-        // Se o leitor achar o código exato
-        if(dados.length === 1 && dados[0].codigo === termo) {
-            selecionarProduto(dados[0]);
-            inputBusca.value = ""; 
-            return;
-        }
-        dados.forEach(p => {
-          const li = document.createElement("li");
-          li.innerHTML = `<strong>${p.nome}</strong> - R$ ${p.preco_venda}`;
-          li.style = "padding:10px; border:1px solid #374151; cursor:pointer; background: #111827; margin-bottom:5px; border-radius:8px;";
-          li.onclick = () => selecionarProduto(p);
-          lista.appendChild(li);
-        });
-      });
-  }, 250);
-});
-
-function selecionarProduto(p) {
-    precoUnitarioAtual = parseFloat(String(p.preco_venda).replace(",", ".")) || 0;
-    prevNome.innerText = p.nome;
-    prevUnit.innerText = "R$ " + dinheiroBR(precoUnitarioAtual);
-    campoCodigoHidden.value = p.codigo;
-    
-    // Limpa e foca na quantidade
-    campoQtd.value = ""; 
-    recalcularTotal();
-    
-    setTimeout(() => {
-        campoQtd.focus();
-    }, 200);
-}
-
-campoQtd.addEventListener("input", recalcularTotal);
-</script>
-{% endblock %}
