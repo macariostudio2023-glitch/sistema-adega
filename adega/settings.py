@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SEGURANÇA
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-chave-temporaria-123")
 
-# Mantenha True para debugarmos qualquer erro final. Depois mudamos para False.
+# DEBUG: True para ver erros no Render. False para produção real.
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
 # Domínios permitidos
@@ -27,7 +27,7 @@ INSTALLED_APPS = [
     "estoque.apps.EstoqueConfig",
 ]
 
-# Ordem correta dos Middlewares (WhiteNoise logo após o Security)
+# Ordem correta dos Middlewares
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware", # Essencial para o Render
@@ -37,9 +37,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    
-    # Comentei o seu Gate para evitar erro 500 até o sistema estabilizar
-    # "estoque.middleware.AdminGateMiddleware", 
 ]
 
 ROOT_URLCONF = 'adega.urls'
@@ -62,17 +59,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'adega.wsgi.application'
 
-# BANCO DE DADOS (Postgres no Render / SQLite Local)
-# =========================
-# DATABASE (FORÇANDO SQLITE PARA ENTREGA)
-# =========================
+# BANCO DE DADOS (Configuração Profissional)
+# Usa Postgres no Render (DATABASE_URL) e SQLite localmente
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
-
 
 # Validação de Senhas
 AUTH_PASSWORD_VALIDATORS = [
@@ -88,19 +82,5 @@ TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# ARQUIVOS ESTÁTICOS (CSS, JS, Imagens)
+# ARQUIVOS ESTÁTICOS
 STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-
-# Armazenamento otimizado para produção
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# CONFIGURAÇÕES DE LOGIN
-LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/entrada-codigo/'
-LOGOUT_REDIRECT_URL = '/login/'
-
-# SENHA DO GATE (Vem das variáveis de ambiente do Render)
-ADMIN_GATE_PASSWORD = os.getenv("ADMIN_GATE_PASSWORD", "1234")
