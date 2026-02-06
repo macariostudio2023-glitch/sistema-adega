@@ -84,3 +84,26 @@ USE_TZ = True
 
 # ARQUIVOS ESTÁTICOS
 STATIC_URL = "/static/"
+
+# O ajuste definitivo para o Render (usando Path):
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Armazenamento otimizado para o Render
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Se você tiver uma pasta 'static' na raiz, adicione isso:
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CONFIGURAÇÕES DE LOGIN
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/entrada-codigo/'
+LOGOUT_REDIRECT_URL = '/login/'
+
+# SENHA DO GATE (Vem das variáveis de ambiente do Render)
+ADMIN_GATE_PASSWORD = os.getenv("ADMIN_GATE_PASSWORD", "1234")
+
+
