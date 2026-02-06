@@ -154,3 +154,8 @@ def admin_gate_check(request):
 
 def home(request):
     return redirect("entrada_codigo")
+
+@login_required
+def vendas_periodo(request):
+    # Por enquanto, apenas redireciona para as vendas de hoje para não dar erro
+    return redirect("vendas_hoje")
