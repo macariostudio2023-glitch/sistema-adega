@@ -56,4 +56,48 @@
         <a href="{% url 'saida_codigo' %}" style="display:block; text-align:center; margin-top:10px; color:#9ca3af; text-decoration:none; font-size:0.9em;">Cancelar</a>
     </div>
     {% else %}
-    <button type="submit" name="acao
+    <button type="submit" name="acao" value="buscar" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #3b82f6; border: none; border-radius: 8px; color: white; cursor: pointer;">
+        BUSCAR PARA VENDA
+    </button>
+    {% endif %}
+  </form>
+
+</div>
+
+
+
+<script>
+  window.onload = function () {
+    const campoCodigo = document.getElementById("id_codigo_barras");
+    const campoQuantidade = document.getElementById("id_quantidade");
+    const spanTotal = document.getElementById("total_venda");
+    const precoTexto = document.getElementById("preco_un_val");
+
+    // Função para calcular o total
+    function calcularTotal() {
+        if (!campoQuantidade || !precoTexto) return;
+        
+        // Converte o preço (ex: 50.00 ou 50,00) para número
+        let preco = parseFloat(precoTexto.innerText.replace(',', '.'));
+        let qtd = parseInt(campoQuantidade.value) || 0;
+        
+        let total = (preco * qtd).toFixed(2);
+        spanTotal.innerText = total.replace('.', ',');
+    }
+
+    if (campoQuantidade) {
+        campoQuantidade.focus();
+        campoQuantidade.select();
+        
+        // Calcula o total inicial (com 1 unidade)
+        calcularTotal();
+
+        // Escuta mudanças na quantidade
+        campoQuantidade.addEventListener("input", calcularTotal);
+        campoQuantidade.addEventListener("change", calcularTotal);
+    } else if (campoCodigo) {
+        campoCodigo.focus();
+    }
+  };
+</script>
+{% endblock %}
