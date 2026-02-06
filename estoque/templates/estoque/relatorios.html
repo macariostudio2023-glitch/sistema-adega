@@ -5,16 +5,25 @@
 {% block content %}
 <div style="max-width: 900px; margin: 20px auto; padding: 20px; background: #111827; color: white; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);">
     
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <h2 style="color: #3b82f6; margin: 0;">📊 Fluxo da Adega</h2>
-        <a href="{% url 'entrada_codigo' %}" style="text-decoration: none; color: #9ca3af; font-size: 0.9em;">+ Nova Operação</a>
+        
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'baixar_relatorio' %}" style="text-decoration: none; background: #059669; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 0.9em;">
+                📥 Baixar Excel
+            </a>
+
+            <a href="{% url 'limpar_relatorio' %}" onclick="return confirm('Tem certeza que deseja apagar TODO o histórico?')" style="text-decoration: none; background: #4b5563; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 0.9em;">
+                🗑️ Limpar
+            </a>
+        </div>
     </div>
 
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
                 <tr style="border-bottom: 2px solid #374151; color: #9ca3af; text-transform: uppercase; font-size: 0.8em;">
-                    <th style="padding: 12px;">Data/Hora</th>
+                    <th style="padding: 12px;">Data / Hora</th>
                     <th style="padding: 12px;">Produto</th>
                     <th style="padding: 12px;">Tipo</th>
                     <th style="padding: 12px;">Qtd</th>
@@ -24,8 +33,10 @@
             <tbody>
                 {% for mov in movimentacoes %}
                 <tr style="border-bottom: 1px solid #1f2937; transition: background 0.3s;" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 12px; font-size: 0.9em; opacity: 0.7;">{{ mov.data_hora|date:"d/m H:i" }}</td>
+                    <td style="padding: 12px; font-size: 0.9em; opacity: 0.7;">{{ mov.data|date:"d/m/Y H:i" }}</td>
+                    
                     <td style="padding: 12px; font-weight: 500;">{{ mov.produto.nome }}</td>
+                    
                     <td style="padding: 12px;">
                         {% if mov.tipo == 'ENTRADA' %}
                             <span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">⬆ ENTRADA</span>
@@ -33,9 +44,11 @@
                             <span style="background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">⬇ SAÍDA</span>
                         {% endif %}
                     </td>
+                    
                     <td style="padding: 12px;">{{ mov.quantidade }}</td>
+                    
                     <td style="padding: 12px; font-weight: bold; color: {% if mov.tipo == 'SAIDA' %}#34d399{% else %}#fff{% endif %};">
-                        R$ {{ mov.valor_total_snapshot|default:"--" }}
+                        R$ {{ mov.valor_total_snapshot|default:"0,00" }}
                     </td>
                 </tr>
                 {% empty %}

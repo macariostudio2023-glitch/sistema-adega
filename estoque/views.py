@@ -68,7 +68,6 @@ def saida_codigo_barras(request):
                     messages.error(request, "❌ Estoque insuficiente!")
                 else:
                     valor_total = produto.preco_venda * quantidade
-                    # Registra a saída
                     Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
                     messages.success(request, f"✅ Venda: {produto.nome} | Total: R$ {valor_total:.2f}")
                     return redirect("saida_codigo")
@@ -99,7 +98,7 @@ def novo_produto(request):
 
     return render(request, "estoque/novo_produto.html", {"codigo": codigo_url, "voltar": onde_voltar})
 
-# --- CONSULTAS E RELATÓRIOS (CORRIGIDOS) ---
+# --- CONSULTAS E RELATÓRIOS ---
 @login_required
 def consultar_estoque(request):
     termo = request.GET.get('q', '').strip()
@@ -110,14 +109,34 @@ def consultar_estoque(request):
 
 @login_required
 def relatorios(request):
-    # CORREÇÃO: Enviando como 'movimentacoes' para o template atraente funcionar
-    movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:50]
-    
-    # Adicionando o cálculo de valor total para cada item do relatório
+    movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:100]
     for m in movs:
         m.valor_total_snapshot = m.quantidade * m.produto.preco_venda
-
     return render(request, "estoque/relatorios.html", {"movimentacoes": movs})
+
+@login_required
+def baixar_relatorio(request):
+    response = HttpResponse(content_type='text/csv')
+    data_arquivo = timezone.now().strftime('%d_%m_%Y')
+    response['Content-Disposition'] = f'attachment; filename="relatorio_adega_{data_arquivo}.csv"'
+    
+    writer = csv.writer(response)
+    # Cabeçalho completo para o Excel
+    writer.writerow(['Data e Hora', 'Produto', 'Tipo', 'Quantidade', 'Preco Unitario', 'Valor Total'])
+    
+    movimentacoes = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")
+    
+    for m in movimentacoes:
+        valor_total = m.quantidade * m.produto.preco_venda
+        writer.writerow([
+            m.data.strftime('%d/%m/%Y %H:%M'), # Inclui a Hora
+            m.produto.nome,
+            m.tipo,
+            m.quantidade,
+            f"{m.produto.preco_venda:.2f}".replace('.', ','),
+            f"{valor_total:.2f}".replace('.', ',')
+        ])
+    return response
 
 @login_required
 def estoque_baixo(request):
@@ -129,16 +148,6 @@ def vendas_hoje(request):
     vendas = Movimentacao.objects.filter(adega=get_adega_atual(request), tipo="SAIDA", data__date=timezone.now().date())
     total = sum(v.quantidade * v.produto.preco_venda for v in vendas)
     return render(request, "estoque/vendas_hoje.html", {"vendas": vendas, "total_valor": total})
-
-@login_required
-def baixar_relatorio(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="estoque.csv"'
-    writer = csv.writer(response)
-    writer.writerow(['Produto', 'Tipo', 'Qtd', 'Data'])
-    for m in Movimentacao.objects.filter(adega=get_adega_atual(request)):
-        writer.writerow([m.produto.nome, m.tipo, m.quantidade, m.data])
-    return response
 
 @login_required
 def limpar_relatorio(request):
@@ -157,5 +166,4 @@ def home(request):
 
 @login_required
 def vendas_periodo(request):
-    # Por enquanto, apenas redireciona para as vendas de hoje para não dar erro
     return redirect("vendas_hoje")
