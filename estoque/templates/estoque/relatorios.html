@@ -1,118 +1,50 @@
 {% extends "estoque/base.html" %}
 
-{% block title %}Relatório de {{ nome_mes }} - Sistema Adega{% endblock %}
+{% block title %}Relatório de Movimentação{% endblock %}
 
 {% block content %}
-<div class="container">
-
-  <h2>📊 Relatório de {{ nome_mes }}</h2>
-  <p class="text-muted">
-    Período: <b>{{ inicio_mes|date:"d/m/Y" }}</b> até <b>{{ hoje|date:"d/m/Y" }}</b>
-  </p>
-
-  <div class="acoes">
-    <a href="{% url 'baixar_relatorio' %}" class="btn btn-download">
-      ⬇️ Baixar CSV
-    </a>
-
-    <form method="post" action="{% url 'limpar_relatorio' %}" class="form-limpar">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-danger"
-        onclick="return confirm('Tem certeza que deseja LIMPAR as vendas do mês? Isso apaga as SAÍDAS do mês atual.')">
-        扫 Limpar Relatório
-      </button>
-    </form>
-  </div>
-
-  <div class="cards">
-    <div class="card resumo">
-      <span>Total vendido</span>
-      <strong>R$ {{ resumo.total_vendido }}</strong>
+<div style="max-width: 900px; margin: 20px auto; padding: 20px; background: #111827; color: white; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #3b82f6; margin: 0;">📊 Fluxo da Adega</h2>
+        <a href="{% url 'entrada_codigo' %}" style="text-decoration: none; color: #9ca3af; font-size: 0.9em;">+ Nova Operação</a>
     </div>
 
-    <div class="card resumo">
-      <span>Itens vendidos</span>
-      <strong>{{ resumo.total_itens }}</strong>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid #374151; color: #9ca3af; text-transform: uppercase; font-size: 0.8em;">
+                    <th style="padding: 12px;">Data/Hora</th>
+                    <th style="padding: 12px;">Produto</th>
+                    <th style="padding: 12px;">Tipo</th>
+                    <th style="padding: 12px;">Qtd</th>
+                    <th style="padding: 12px;">Valor Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in movimentacoes %}
+                <tr style="border-bottom: 1px solid #1f2937; transition: background 0.3s;" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 12px; font-size: 0.9em; opacity: 0.7;">{{ mov.data_hora|date:"d/m H:i" }}</td>
+                    <td style="padding: 12px; font-weight: 500;">{{ mov.produto.nome }}</td>
+                    <td style="padding: 12px;">
+                        {% if mov.tipo == 'ENTRADA' %}
+                            <span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">⬆ ENTRADA</span>
+                        {% else %}
+                            <span style="background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">⬇ SAÍDA</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px;">{{ mov.quantidade }}</td>
+                    <td style="padding: 12px; font-weight: bold; color: {% if mov.tipo == 'SAIDA' %}#34d399{% else %}#fff{% endif %};">
+                        R$ {{ mov.valor_total_snapshot|default:"--" }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 30px; text-align: center; opacity: 0.5;">Nenhuma movimentação registrada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    <div class="card resumo">
-      <span>Nº de vendas</span>
-      <strong>{{ resumo.total_vendas }}</strong>
-    </div>
-  </div>
-
-  <div class="card tabela">
-    <h3>Detalhamento das vendas</h3>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Produto</th>
-          <th>Qtd</th>
-          <th>Preço</th>
-          <th>Total</th>
-          <th>Tipo</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for mov in itens %}
-        <tr>
-          <td>{{ mov.data|date:"d/m/Y H:i" }}</td>
-          <td>{{ mov.produto_nome }}</td>
-          <td>{{ mov.quantidade }}</td>
-          <td>R$ {{ mov.preco_venda }}</td>
-          <td>R$ {{ mov.total_linha }}</td>
-          <td>{{ mov.tipo }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" class="vazio">
-            Nenhuma venda encontrada em {{ nome_mes }}.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
 </div>
-
-<style>
-.container { max-width: 1100px; padding: 22px; border-radius: 14px; background: rgba(17, 24, 39, 0.88); margin: 0 auto; }
-h2, h3 { color: #f9fafb; margin-top: 0; }
-.text-muted { color: #cbd5e1; margin-bottom: 16px; }
-
-.card {
-  background: rgba(31, 41, 55, 0.92);
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,.25);
-  color: #f9fafb;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.resumo span { font-size: 13px; color: #cbd5e1; display: block; }
-.resumo strong { font-size: 22px; color: #ffffff; }
-
-.tabela table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.tabela th, .tabela td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.12); color: #f9fafb; }
-.tabela th { text-align: left; font-size: 13px; color: #cbd5e1; text-transform: uppercase; }
-
-.vazio { text-align: center; color: #cbd5e1; padding: 40px; font-style: italic; }
-
-.acoes { display: flex; gap: 10px; align-items: center; margin: 10px 0 18px; }
-.btn { padding: 10px 14px; border-radius: 10px; font-weight: 700; text-decoration: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
-.btn-download { background: #22c55e; color: #052e16; }
-.btn-download:hover { background: #16a34a; transform: scale(1.02); }
-.btn-danger { background: #ef4444; color: #fff; }
-.btn-danger:hover { background: #dc2626; transform: scale(1.02); }
-.form-limpar { margin: 0; }
-</style>
 {% endblock %}
