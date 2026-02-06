@@ -37,11 +37,16 @@
     <div style="margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444;">
         <h3 style="margin: 0; color: #f87171;">{{ produto.nome }}</h3>
         <p style="margin: 5px 0; opacity: 0.8;">Estoque atual: <strong>{{ produto.estoque_atual }}</strong></p>
-        <p style="margin: 5px 0; color: #34d399;">Preço: <strong>R$ {{ produto.preco_venda }}</strong></p>
+        <p style="margin: 5px 0; color: #34d399;">Preço Unitário: <strong>R$ <span id="preco_un_val">{{ produto.preco_venda }}</span></strong></p>
         
         <label style="text-align:left; margin-top: 10px; display: block;">Quantidade a vender</label>
         <input type="number" name="quantidade" id="id_quantidade" value="1" min="1" max="{{ produto.estoque_atual }}"
-               style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white;">
+               style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white; font-size: 1.2em;">
+
+        <div style="margin-top: 15px; padding: 15px; background: #065f46; border-radius: 8px; text-align: center; border: 2px solid #34d399;">
+            <span style="display:block; font-size: 0.9em; text-transform: uppercase;">Total da Venda</span>
+            <strong style="font-size: 1.8em;">R$ <span id="total_venda">0,00</span></strong>
+        </div>
 
         <button type="submit" name="acao" value="salvar" 
                 style="margin-top: 15px; width: 100%; padding: 15px; font-size: 1.1em; background: #ef4444; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;">
@@ -51,24 +56,4 @@
         <a href="{% url 'saida_codigo' %}" style="display:block; text-align:center; margin-top:10px; color:#9ca3af; text-decoration:none; font-size:0.9em;">Cancelar</a>
     </div>
     {% else %}
-    <button type="submit" name="acao" value="buscar" style="margin-top: 20px; width: 100%; padding: 15px; font-size: 1.1em; background: #3b82f6; border: none; border-radius: 8px; color: white; cursor: pointer;">
-        BUSCAR PARA VENDA
-    </button>
-    {% endif %}
-  </form>
-
-</div>
-
-<script>
-  window.onload = function () {
-    const campoCodigo = document.getElementById("id_codigo_barras");
-    const campoQuantidade = document.getElementById("id_quantidade");
-    if (campoQuantidade) {
-        campoQuantidade.focus();
-        campoQuantidade.select();
-    } else if (campoCodigo) {
-        campoCodigo.focus();
-    }
-  };
-</script>
-{% endblock %}
+    <button type="submit" name="acao
