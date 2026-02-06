@@ -1,6 +1,6 @@
+import csv
 from datetime import datetime
 from decimal import Decimal
-import csv
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
@@ -43,7 +43,6 @@ def entrada_codigo_barras(request):
                 qtd_raw = request.POST.get("quantidade", "1").strip()
                 quantidade = int(qtd_raw) if qtd_raw.isdigit() else 1
                 Movimentacao.objects.create(adega=adega, produto=produto, tipo="ENTRADA", quantidade=quantidade)
-                # O AVISO VERDE AQUI:
                 messages.success(request, f"✅ Entrada: {produto.nome} (+{quantidade})")
                 return redirect("entrada_codigo")
         except Produto.DoesNotExist:
@@ -68,15 +67,10 @@ def saida_codigo_barras(request):
                 if produto.estoque_atual < quantidade:
                     messages.error(request, "❌ Estoque insuficiente!")
                 else:
-                    # Calcula o valor total da venda atual
                     valor_total = produto.preco_venda * quantidade
-                    
                     # Registra a saída
                     Movimentacao.objects.create(adega=adega, produto=produto, tipo="SAIDA", quantidade=quantidade)
-                    
-                    # AVISO TURBINADO: Agora mostra o valor para o vendedor
                     messages.success(request, f"✅ Venda: {produto.nome} | Total: R$ {valor_total:.2f}")
-                    
                     return redirect("saida_codigo")
         except Produto.DoesNotExist:
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/saida-codigo/")
@@ -105,7 +99,7 @@ def novo_produto(request):
 
     return render(request, "estoque/novo_produto.html", {"codigo": codigo_url, "voltar": onde_voltar})
 
-# --- CONSULTAS E RELATÓRIOS ---
+# --- CONSULTAS E RELATÓRIOS (CORRIGIDOS) ---
 @login_required
 def consultar_estoque(request):
     termo = request.GET.get('q', '').strip()
@@ -116,8 +110,14 @@ def consultar_estoque(request):
 
 @login_required
 def relatorios(request):
+    # CORREÇÃO: Enviando como 'movimentacoes' para o template atraente funcionar
     movs = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")[:50]
-    return render(request, "estoque/relatorios.html", {"itens": movs})
+    
+    # Adicionando o cálculo de valor total para cada item do relatório
+    for m in movs:
+        m.valor_total_snapshot = m.quantidade * m.produto.preco_venda
+
+    return render(request, "estoque/relatorios.html", {"movimentacoes": movs})
 
 @login_required
 def estoque_baixo(request):
@@ -154,33 +154,3 @@ def admin_gate_check(request):
 
 def home(request):
     return redirect("entrada_codigo")
-
-# --- ADICIONE ISSO NO FINAL DO SEU views.py ---
-
-@login_required
-def vendas_periodo(request):
-    # Por enquanto, redireciona para as vendas de hoje
-    return redirect("vendas_hoje")
-
-@login_required
-def baixar_relatorio(request):
-    import csv
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="estoque.csv"'
-    writer = csv.writer(response)
-    writer.writerow(['Produto', 'Tipo', 'Qtd', 'Data'])
-    for m in Movimentacao.objects.filter(adega=get_adega_atual(request)):
-        writer.writerow([m.produto.nome, m.tipo, m.quantidade, m.data])
-    return response
-
-@login_required
-def limpar_relatorio(request):
-    Movimentacao.objects.filter(adega=get_adega_atual(request)).delete()
-    return redirect("relatorios")
-
-@csrf_exempt
-def admin_gate_check(request):
-    if request.method == "POST" and request.POST.get("senha") == settings.ADMIN_GATE_PASSWORD:
-        request.session["admin_gate_ok"] = True
-        return JsonResponse({"ok": True})
-    return JsonResponse({"ok": False}, status=401)
