@@ -6,6 +6,24 @@
 {% block content %}
 <div class="centered-card" style="max-width: 500px; margin: 0 auto;">
 
+  {% if promos %}
+  <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; padding: 15px; margin-bottom: 25px; border-radius: 12px;">
+      <h3 style="color: #f59e0b; margin: 0 0 10px 0; font-size: 1em; display: flex; align-items: center; gap: 8px;">
+        <span>🔥</span> Radar de Oportunidades (Atacado)
+      </h3>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+          {% for promo in promos %}
+          <li style="margin-bottom: 10px; border-bottom: 1px solid rgba(245, 158, 11, 0.2); padding-bottom: 8px;">
+              <a href="{{ promo.link }}" target="_blank" style="color: #e2e8f0; text-decoration: none; font-size: 0.85em; line-height: 1.4; display: block;">
+                  {{ promo.titulo }} <span style="color: #3b82f6; font-weight: bold;">[ler]</span>
+              </a>
+          </li>
+          {% endfor %}
+      </ul>
+      <p style="margin: 5px 0 0 0; font-size: 0.7em; opacity: 0.6; text-align: right;">Atualizado agora</p>
+  </div>
+  {% endif %}
+
   <h2 style="text-align:center;">📦 Entrada de Estoque</h2>
   <p style="text-align:center; margin-top:6px; font-size: 0.9em; opacity: 0.8;">
     {% if produto %} CONFIRME OS DADOS ABAIXO {% else %} APONTE O LEITOR PARA LOCALIZAR {% endif %}
@@ -82,7 +100,6 @@
     }
   };
 
-  // Lógica de busca rápida (opcional)
   const campoBusca = document.getElementById("busca-produto");
   if (campoBusca) {
     campoBusca.addEventListener("input", function() {

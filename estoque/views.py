@@ -1,4 +1,6 @@
 import csv
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from decimal import Decimal
 from django.shortcuts import render, redirect
@@ -28,6 +30,31 @@ def get_adega_atual(request):
     except:
         return None
 
+def buscar_promocoes_atacado():
+    """Busca notícias de promoções e varejo em tempo real"""
+    try:
+        # Buscando notícias no Giro News (referência em Atacado/Varejo)
+        url = "https://www.gironews.com/category/atacadista/"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        noticias = []
+        # Pega as últimas 3 notícias/ofertas do portal
+        posts = soup.find_all('article', limit=3)
+        for post in posts:
+            link_tag = post.find('a')
+            titulo_tag = post.find('h2') or post.find('h3')
+            if link_tag and titulo_tag:
+                noticias.append({
+                    'titulo': titulo_tag.get_text().strip(),
+                    'link': link_tag['href']
+                })
+        return noticias
+    except Exception as e:
+        print(f"Erro ao buscar promos: {e}")
+        return []
+
 # --- OPERAÇÕES ---
 @login_required
 def entrada_codigo_barras(request):
@@ -48,7 +75,14 @@ def entrada_codigo_barras(request):
         except Produto.DoesNotExist:
             return redirect(f"/novo-produto/?codigo={codigo}&voltar=/entrada-codigo/")
     
-    return render(request, "estoque/entrada_codigo.html", {"produto": produto, "codigo": codigo})
+    # BUSCA AS PROMOÇÕES EM TEMPO REAL PARA O DONO
+    promos = buscar_promocoes_atacado()
+    
+    return render(request, "estoque/entrada_codigo.html", {
+        "produto": produto, 
+        "codigo": codigo,
+        "promos": promos
+    })
 
 @login_required
 def saida_codigo_barras(request):
@@ -121,19 +155,15 @@ def baixar_relatorio(request):
     response['Content-Disposition'] = f'attachment; filename="relatorio_adega_{data_arquivo}.csv"'
     
     writer = csv.writer(response, delimiter=';')
-    response.write(u'\ufeff'.encode('utf8')) # Garante acentos no Excel
+    response.write(u'\ufeff'.encode('utf8'))
     
-    # Cabeçalho
     writer.writerow(['Data e Hora', 'Produto', 'Tipo', 'Quantidade', 'Preço Unit.', 'Valor Total'])
     
     movimentacoes = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")
-    
     faturamento_total = Decimal("0.00")
     
     for m in movimentacoes:
         valor_operacao = m.quantidade * m.produto.preco_venda
-        
-        # Só somamos no faturamento se for uma SAÍDA (venda)
         if m.tipo == 'SAIDA':
             faturamento_total += valor_operacao
             
@@ -146,12 +176,10 @@ def baixar_relatorio(request):
             f"{valor_operacao:.2f}".replace('.', ',')
         ])
     
-    # LINHA DE FECHAMENTO
-    writer.writerow([]) # Linha em branco para separar
+    writer.writerow([])
     writer.writerow(['', '', '', '', 'FATURAMENTO TOTAL:', f"R$ {faturamento_total:.2f}".replace('.', ',')])
     
     return response
-
 
 @login_required
 def estoque_baixo(request):
