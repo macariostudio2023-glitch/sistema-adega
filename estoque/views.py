@@ -120,28 +120,38 @@ def baixar_relatorio(request):
     data_arquivo = timezone.now().strftime('%d_%m_%Y')
     response['Content-Disposition'] = f'attachment; filename="relatorio_adega_{data_arquivo}.csv"'
     
-    # O segredo: usar delimitador de ponto e vírgula para o Excel BR
     writer = csv.writer(response, delimiter=';')
-    
-    # Esta linha abaixo ajuda o Excel a entender a codificação correta
-    response.write(u'\ufeff'.encode('utf8'))
+    response.write(u'\ufeff'.encode('utf8')) # Garante acentos no Excel
     
     # Cabeçalho
     writer.writerow(['Data e Hora', 'Produto', 'Tipo', 'Quantidade', 'Preço Unit.', 'Valor Total'])
     
     movimentacoes = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")
     
+    faturamento_total = Decimal("0.00")
+    
     for m in movimentacoes:
-        valor_total = m.quantidade * m.produto.preco_venda
+        valor_operacao = m.quantidade * m.produto.preco_venda
+        
+        # Só somamos no faturamento se for uma SAÍDA (venda)
+        if m.tipo == 'SAIDA':
+            faturamento_total += valor_operacao
+            
         writer.writerow([
             m.data.strftime('%d/%m/%Y %H:%M'),
             m.produto.nome,
             m.tipo,
             m.quantidade,
             f"{m.produto.preco_venda:.2f}".replace('.', ','),
-            f"{valor_total:.2f}".replace('.', ',')
+            f"{valor_operacao:.2f}".replace('.', ',')
         ])
+    
+    # LINHA DE FECHAMENTO
+    writer.writerow([]) # Linha em branco para separar
+    writer.writerow(['', '', '', '', 'FATURAMENTO TOTAL:', f"R$ {faturamento_total:.2f}".replace('.', ',')])
+    
     return response
+
 
 @login_required
 def estoque_baixo(request):
