@@ -116,20 +116,25 @@ def relatorios(request):
 
 @login_required
 def baixar_relatorio(request):
-    response = HttpResponse(content_type='text/csv')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     data_arquivo = timezone.now().strftime('%d_%m_%Y')
     response['Content-Disposition'] = f'attachment; filename="relatorio_adega_{data_arquivo}.csv"'
     
-    writer = csv.writer(response)
-    # Cabeçalho completo para o Excel
-    writer.writerow(['Data e Hora', 'Produto', 'Tipo', 'Quantidade', 'Preco Unitario', 'Valor Total'])
+    # O segredo: usar delimitador de ponto e vírgula para o Excel BR
+    writer = csv.writer(response, delimiter=';')
+    
+    # Esta linha abaixo ajuda o Excel a entender a codificação correta
+    response.write(u'\ufeff'.encode('utf8'))
+    
+    # Cabeçalho
+    writer.writerow(['Data e Hora', 'Produto', 'Tipo', 'Quantidade', 'Preço Unit.', 'Valor Total'])
     
     movimentacoes = Movimentacao.objects.filter(adega=get_adega_atual(request)).order_by("-data")
     
     for m in movimentacoes:
         valor_total = m.quantidade * m.produto.preco_venda
         writer.writerow([
-            m.data.strftime('%d/%m/%Y %H:%M'), # Inclui a Hora
+            m.data.strftime('%d/%m/%Y %H:%M'),
             m.produto.nome,
             m.tipo,
             m.quantidade,
